@@ -269,6 +269,7 @@ class _GCConversationState extends State<GCConversation> {
                           )),
                     ),
                   ),
+                  
                   Expanded(
                     flex: 1,
                     child: GestureDetector(

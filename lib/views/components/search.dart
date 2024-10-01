@@ -157,7 +157,6 @@ class _SearchState extends State<Search> {
     });
   }
 
-  //still need to find explanation:
 
   String getChatRoomId(String a, String b) {
     if (a.substring(0, 1).codeUnitAt(0) > b.substring(0, 1).codeUnitAt(0)) {
