@@ -1,0 +1,30 @@
+{
+  "project_info": {
+    "project_number": "1057229849830",
+    "firebase_url": "https://chat-app-schools-default-rtdb.firebaseio.com",
+    "project_id": "chat-app-schools",
+    "storage_bucket": "chat-app-schools.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1057229849830:android:2e806072b2e3460099a727",
+        "android_client_info": {
+          "package_name": "com.virtualhelp.chatapp"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCMd2CIMbagi0XzdQQQ3VgL-w2xhXAqrkw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
