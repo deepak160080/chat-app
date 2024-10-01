@@ -17,8 +17,8 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
   final _formKey = GlobalKey<FormState>();late String heroTag;
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
-  String _email = '';
-  String _password = '';
+  final String _email = '';
+  final String _password = '';
   
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -81,7 +81,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           }
                           return null;
                         },
-                        onSaved: (value) => _email = value!,
+                       
                       ),
                       const SizedBox(height: 20),
                       AppTextfield(
@@ -95,7 +95,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                           }
                           return null;
                         },
-                        onSaved: (value) => _password = value!,
+                      
                       ),
                       const SizedBox(height: 40),
                       AppButton(
@@ -104,9 +104,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                       ),
                       const SizedBox(height: 20),
                       TextButton(
-                        onPressed: () {
-                          // Implement forgot password functionality
-                        },
+                        onPressed: () {},
                         child: Text(widget.userType == UserType.teacher
                             ? "Forgot Password?"
                             : "If you forget details, contact your teacher"),
