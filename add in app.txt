@@ -1,0 +1,33 @@
+add logo in chat page background  with opicity 0.5(Done)
+
+teachers techer login page pr hi login kr paye 
+student student login page pr hi kr paye
+
+add options file share and documentation 
+doenot share video and link (Done)
+
+only zoom meeting link can share or no other link can share(Done)
+
+bug in send textfield {Done}
+
+student side pr search widget hogi {Done}
+
+group add widget techer side pr hogii {Done}
+
+student sirf techer ko serach krta skta uske usename se (forex.- Deepak)
+and save use name Deepak_T [Done]
+
+donot share gmail or email or mobile number in a chat 
+mobile no - 12346 = ******* {Done}
+
+show doc in app {Done}
+
+image preview honi chye just like whatsapp
+image preview like in chat preview and when open it also preview
+
+doc m dwnld button just like whatsapp
+
+_t is type se rhna chye
+username can be small not capitalized
+
+

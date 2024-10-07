@@ -16,7 +16,7 @@ class PhoneNumberTextField extends StatelessWidget {
     this.validator,
     this.onChanged,
     this.autofocus = false,
-    this.focusNode,
+    this.focusNode, required bool enabled,
   });
 
   @override

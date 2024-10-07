@@ -1,6 +1,5 @@
 
-import 'package:chat_app/views/auth/signin.dart';
-import 'package:chat_app/views/auth/signup.dart';
+import 'package:chat_app/views/auth/login_page.dart';
 import 'package:flutter/material.dart';
 
 class Authenticate extends StatefulWidget {
@@ -29,9 +28,8 @@ class _AuthenticateState extends State<Authenticate> {
           child: child,
         );
       },
-      child: _showSignIn
-          ? SignIn(onToggleView: _toggleView, key: const ValueKey('signIn'))
-          : SignUp(onToggleView: _toggleView, key: const ValueKey('signUp')),
+      child: LoginPage(userType: _showSignIn ? UserType.student : UserType.teacher,),
+          
     );
   }
 }

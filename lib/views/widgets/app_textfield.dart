@@ -16,15 +16,18 @@ class AppTextfield extends StatelessWidget {
   final int? maxLines;
   final int? minLines;
   final bool autofocus;
+  final Widget? suffixIcon;
   final FocusNode? focusNode;
   final VoidCallback? onTap;
   final bool showPhone;
+  final bool enabled;  // Added enabled property
 
   const AppTextfield({
     super.key,
     required this.icon,
     required this.hintText,
     required this.controller,
+    this.suffixIcon,
     this.validator,
     this.onChanged,
     this.obscureText = false,
@@ -36,6 +39,7 @@ class AppTextfield extends StatelessWidget {
     this.focusNode,
     this.onTap,
     this.showPhone = false,
+    this.enabled = true,  // Default value is true
   });
 
   @override
@@ -44,15 +48,17 @@ class AppTextfield extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 16),
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 5),
       decoration: BoxDecoration(
-        color: AppColors.surfaceColor,
+        color: enabled 
+            ? AppColors.surfaceColor 
+            : AppColors.surfaceColor.withOpacity(0.7),  // Slightly dim when disabled
         borderRadius: BorderRadius.circular(10),
-        boxShadow: [
+        boxShadow: enabled ? [
           BoxShadow(
             color: Colors.black.withOpacity(0.05),
             blurRadius: 5,
             offset: const Offset(0, 3),
           ),
-        ],
+        ] : null,  // Remove shadow when disabled
       ),
       child: showPhone
           ? PhoneNumberTextField(
@@ -61,10 +67,13 @@ class AppTextfield extends StatelessWidget {
               onChanged: onChanged,
               autofocus: autofocus,
               focusNode: focusNode,
+              enabled: enabled,  // Pass enabled to phone field
             )
           : TextFormField(
               style: GoogleFonts.archivo(
-                color: AppColors.primaryTextColor,
+                color: enabled 
+                    ? AppColors.primaryTextColor
+                    : AppColors.primaryTextColor.withOpacity(0.6),  // Dim text when disabled
                 fontSize: 16,
               ),
               controller: controller,
@@ -77,12 +86,23 @@ class AppTextfield extends StatelessWidget {
               minLines: minLines,
               autofocus: autofocus,
               focusNode: focusNode,
-              onTap: onTap,
+              
+              onTap: enabled ? onTap : null,  // Only allow tap when enabled
+              enabled: enabled,  // Enable/disable the field
               decoration: InputDecoration(
-                icon: Icon(icon, color: AppColors.iconColor, size: 24),
+                suffixIcon: suffixIcon,
+                icon: Icon(
+                  icon, 
+                  color: enabled 
+                      ? AppColors.iconColor
+                      : AppColors.iconColor.withOpacity(0.6),  // Dim icon when disabled
+                  size: 24,
+                ),
                 hintText: hintText,
                 hintStyle: GoogleFonts.archivo(
-                  color: AppColors.secondaryTextColor,
+                  color: enabled
+                      ? AppColors.secondaryTextColor
+                      : AppColors.secondaryTextColor.withOpacity(0.6),  // Dim hint text when disabled
                   fontSize: 16,
                 ),
                 border: InputBorder.none,

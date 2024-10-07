@@ -1,259 +1,405 @@
 import 'package:chat_app/services/constants.dart';
 import 'package:chat_app/services/database.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hexcolor/hexcolor.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:random_avatar/random_avatar.dart';
+import 'package:flutter_chat_ui/flutter_chat_ui.dart';
+import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
+import 'dart:io';
+import 'package:open_file/open_file.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:http/http.dart' as http;
 
 class Conversation extends StatefulWidget {
-  final roomId;
-  final name;
-  final svg;
-  const Conversation(
-      {required this.roomId, required this.svg, required this.name, super.key});
+  final String roomId;
+  final String svg;
+  final String name;
+
+  const Conversation({
+    super.key,
+    required this.roomId,
+    required this.svg,
+    required this.name,
+  });
 
   @override
-  State<Conversation> createState() => _ConversationState();
+  _ConversationState createState() => _ConversationState();
 }
 
 class _ConversationState extends State<Conversation> {
   final DatabaseMethods _databaseMethods = DatabaseMethods();
-  final TextEditingController _messageController = TextEditingController();
-  Stream? streamForInitialMessages;
-  DateTime now = DateTime.now();
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+  final ImagePicker _imagePicker = ImagePicker();
+  List<types.Message> _messages = [];
+  late types.User _user;
 
-  int unreadMessages = 0;
+  @override
+  void initState() {
+    super.initState();
+    _user = types.User(id: Constants.localUsername);
+    _loadMessages();
+  }
 
-
-  Widget paginate() {
-    return FirestorePagination(
-      reverse: true,
-      isLive: true,
-      query: FirebaseFirestore.instance
-          .collection("chatrooms")
-          .doc(widget.roomId)
-          .collection("chats")
-          .orderBy("time", descending: true),
-      itemBuilder: (context, docs, index) {
-        final data = (docs)[index].data() as Map<String, dynamic>;
-        if (data.isNotEmpty) {
-          final documents = docs;
-          final notSeenDocs = [];
-
-          print(documents.length);
-          for (var i = 0; i < documents.length; i++) {
-            if ((((documents[i].data() as Map<String, dynamic>))["seen"] ==
-                    false) &&
-                (((documents[i].data() as Map<String, dynamic>))["sender"] !=
-                    Constants.localUsername)) {
-              notSeenDocs.add((documents[i]).id.toString());
-              _databaseMethods.updateSeen(
-                  widget.roomId, (documents[i]).id.toString(), true);
-              _databaseMethods.updateUnreadMessages(
-                  widget.roomId, 0, Constants.localUsername);
-            }
-            _databaseMethods.updateSeen(widget.roomId, (documents[i]).id.toString(), true);
+  void _loadMessages() {
+    FirebaseFirestore.instance
+        .collection("conversations")
+        .doc("${Constants.localUsername}_chat")
+        .collection("chats")
+        .orderBy("time", descending: true)
+        .snapshots()
+        .listen((snapshot) {
+      setState(() {
+        _messages = snapshot.docs.map((doc) {
+          final data = doc.data();
+          if (data['isImage'] == true) {
+            return types.ImageMessage(
+              author: types.User(id: data['sender']),
+              id: doc.id,
+              uri: data['imageUrl'],
+              size: data['size'] ?? 0,
+              name: data['fileName'] ?? '',
+              createdAt: data['time'],
+            );
+          } else if (data['isFile'] == true) {
+            return types.FileMessage(
+              author: types.User(id: data['sender']),
+              id: doc.id,
+              name: data['fileName'] ?? '',
+              size: data['size'] ?? 0,
+              uri: data['fileUrl'],
+              createdAt: data['time'],
+            );
+          } else {
+            return types.TextMessage(
+              author: types.User(id: data['sender']),
+              id: doc.id,
+              text: data['message'],
+              createdAt: data['time'],
+            );
           }
-        }
-        return MessageTile(
-          chatId: docs[index].id,
-          seen: (data["seen"] != null) ? data["seen"] : true,
-          roomId: widget.roomId,
-          message: data["message"],
-          sentByLocalUser:
-              (data["sender"].toString() == Constants.localUsername)
-                  ? true
-                  : false,
-          time: DateTime.fromMillisecondsSinceEpoch(
-              int.parse((data["time"]).toString())),
-          deleted: (data["deleted"] == null) ? false : (data["deleted"]),
+        }).toList();
+      });
+    });
+  }
+
+  Future<String?> _uploadFile(File file, String fileName) async {
+    try {
+      final ref = _storage.ref().child('chat_files/${DateTime.now().millisecondsSinceEpoch}_$fileName');
+      final uploadTask = ref.putFile(file);
+      final snapshot = await uploadTask.whenComplete(() {});
+      return await snapshot.ref.getDownloadURL();
+    } catch (e) {
+      print('Error uploading file: $e');
+      return null;
+    }
+  }
+
+  void _handleSendPressed(types.PartialText message) {
+    _sendMessage(message.text);
+  }
+
+  void _handleAttachmentPressed() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: SizedBox(
+            height: 144,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _handleImageSelection();
+                  },
+                  child: const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Photo'),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    Navigator.pop(context);
+                    _handleFileSelection();
+                  },
+                  child: const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('File'),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Align(
+                    alignment: Alignment.centerLeft,
+                    child: Text('Cancel'),
+                  ),
+                ),
+              ],
+            ),
+          ),
         );
       },
     );
   }
 
-  // Widget chatList(){
-  //   return StreamBuilder(
-  //       stream: streamForInitialMessages,
-  //       builder: (context, snapshot){
-  //         if(snapshot.hasData){
-  //           final documents = snapshot.data!.docs;
-  //           final notSeenDocs = [];
-  //
-  //           for(var i = 0; i < documents.length; i++){
-  //             if((((documents[i]).data())["seen"] == false) && (((documents[i]).data())["sender"] != Constants.localUsername)){
-  //               notSeenDocs.add((documents[i] as DocumentSnapshot).id.toString());
-  //               _databaseMethods.updateSeen(widget.roomId, (documents[i] as DocumentSnapshot).id.toString(), true);
-  //               _databaseMethods.updateUnreadMessages(widget.roomId, 0, Constants.localUsername);
-  //             }
-  //
-  //             //print(notSeenDocs);
-  //             // _databaseMethods.updateSeen(widget.roomId, (documents[i] as DocumentSnapshot).id.toString(), true);
-  //           }
-  //         }
-  //         return snapshot.hasData ? ListView.builder(
-  //           itemCount: snapshot.data.docs.length,
-  //           itemBuilder: (context, index){
-  //             return MessageTile(
-  //               seen: ((snapshot.data.docs[index].data())["seen"] != null) ? (snapshot.data.docs[index].data())["seen"] : true,
-  //               roomId: widget.roomId,
-  //               chatId: (snapshot.data!.docs[index] as DocumentSnapshot).id.toString(),
-  //               message: (snapshot.data.docs[index].data())["message"],
-  //               sentByLocalUser: (((snapshot.data.docs[index].data())["sender"]).toString() == Constants.localUsername ) ? true : false,
-  //               time: DateTime.fromMillisecondsSinceEpoch(int.parse(
-  //                   ((snapshot.data.docs[index].data())["time"]).toString()
-  //               )),
-  //               deleted: ((snapshot.data.docs[index].data()["deleted"]) == null )
-  //               ? false : (snapshot.data.docs[index].data()["deleted"]),
-  //
-  //             );
-  //           },
-  //         ) : Center(child: CircularProgressIndicator(color: HexColor("#5953ff"),));
-  //       }
-  //   );
-  // }
+  void _handleFileSelection() async {
+    final result = await FilePicker.platform.pickFiles(
+      type: FileType.any,
+    );
 
-  sendMessage() async {
-    // String formattedTime = DateFormat('HH:mm').format(now);
-    String date = "${now.day}/${now.month}/${now.year}";
-    Map<String, dynamic> userMap = {
-      "message": _messageController.text.trim(),
+    if (result != null && result.files.single.path != null) {
+      final file = File(result.files.single.path!);
+      final fileName = result.files.single.name;
+      final fileSize = result.files.single.size;
+      final fileUrl = await _uploadFile(file, fileName);
+
+      if (fileUrl != null) {
+        final message = types.PartialFile(
+          name: fileName,
+          size: fileSize,
+          uri: fileUrl,
+        );
+        _sendMessage('', file: message);
+      }
+    }
+  }
+
+  void _handleImageSelection() async {
+    final result = await _imagePicker.pickImage(
+      imageQuality: 70,
+      maxWidth: 1440,
+      source: ImageSource.gallery,
+    );
+
+    if (result != null) {
+      final file = File(result.path);
+      final fileName = result.name;
+      final imageUrl = await _uploadFile(file, fileName);
+
+      if (imageUrl != null) {
+        final bytes = await file.readAsBytes();
+        final image = await decodeImageFromList(bytes);
+        final message = types.PartialImage(
+          height: image.height.toDouble(),
+          name: fileName,
+          size: bytes.length,
+          uri: imageUrl,
+          width: image.width.toDouble(),
+        );
+        _sendMessage('', image: message);
+      }
+    }
+  }
+String _sanitizeMessage(String message) {
+    // Regular expressions for detecting sensitive information
+    final phoneRegex = RegExp(r'\b\d{10}\b|\b\d{3}[-.]?\d{3}[-.]?\d{4}\b');
+    final emailRegex = RegExp(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b');
+    final linkRegex = RegExp(r'(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})');
+    
+    // List of abusive words (this list should be more comprehensive in a real application)
+    final abuseWords = ['abuse', 'hate', 'stupid'];
+
+    // Replace phone numbers
+    message = message.replaceAllMapped(phoneRegex, (match) => '*' * match.group(0)!.length);
+
+    // Replace email addresses
+    message = message.replaceAllMapped(emailRegex, (match) => '*' * match.group(0)!.length);
+
+    // Replace links, except Google Meet links
+    message = message.replaceAllMapped(linkRegex, (match) {
+      final link = match.group(0)!;
+      if (link.contains('meet.google.com')) {
+        return link;
+      }
+      return '*' * link.length;
+    });
+
+    // Replace abusive words
+    for (final word in abuseWords) {
+      final regex = RegExp(r'\b' + word + r'\b', caseSensitive: false);
+      message = message.replaceAllMapped(regex, (match) => '*' * match.group(0)!.length);
+    }
+
+    return message;
+  }
+
+  void _sendMessage(String messageText, {types.PartialImage? image, types.PartialFile? file}) async {
+    // Sanitize the message text
+    final sanitizedMessageText = _sanitizeMessage(messageText);
+
+    final messageMap = {
+      "message": sanitizedMessageText,
       "sender": Constants.localUsername,
+      "receiver": widget.name,
       "time": DateTime.now().millisecondsSinceEpoch,
-      "date": date,
+      "date": "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}",
       "deleted": false,
-      "seen": false
+      "seen": false,
     };
-    setState(() {
-      _messageController.text = "";
-      unreadMessages++;
-      print(unreadMessages);
-    });
-    await _databaseMethods.conversation(widget.roomId, userMap).then((a) {
-      print("done: $a");
-    });
-    await _databaseMethods.updateUnreadMessages(
-        widget.roomId, unreadMessages, widget.name);
-  }
 
-  @override
-  void initState() {
-    // getInitialMessages();
-    super.initState();
-  }
-
-  getInitialMessages() async {
-    _databaseMethods.getConversation(widget.roomId).then((val) {
-      setState(() {
-        streamForInitialMessages = val;
+    if (image != null) {
+      messageMap.addAll({
+        "isImage": true,
+        "imageUrl": image.uri,
+        "fileName": image.name,
+        "size": image.size,
       });
-    });
+    } else if (file != null) {
+      messageMap.addAll({
+        "isFile": true,
+        "fileUrl": file.uri,
+        "fileName": file.name,
+        "size": file.size,
+      });
+    }
+
+    // Save in sender's conversation
+    await FirebaseFirestore.instance
+        .collection("conversations")
+        .doc("${Constants.localUsername}_chat")
+        .collection("chats")
+        .add(messageMap);
+
+    // Save in receiver's conversation
+    await FirebaseFirestore.instance
+        .collection("conversations")
+        .doc("${widget.name}_chat")
+        .collection("chats")
+        .add(messageMap);
+
+    await _databaseMethods.updateUnreadMessages(widget.roomId, 1, widget.name);
+  }
+  void _handleMessageTap(BuildContext _, types.Message message) async {
+    if (message is types.FileMessage) {
+      var localPath = message.uri;
+
+      if (!message.uri.startsWith('file://')) {
+        final client = http.Client();
+        final request = await client.get(Uri.parse(message.uri));
+        final bytes = request.bodyBytes;
+        final documentsDir = (await getApplicationDocumentsDirectory()).path;
+        localPath = '$documentsDir/${message.name}';
+
+        if (!File(localPath).existsSync()) {
+          final file = File(localPath);
+          await file.writeAsBytes(bytes);
+        }
+      }
+
+      await OpenFile.open(localPath);
+    }
   }
 
-  @override
+   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: HexColor("#131419"),
       appBar: AppBar(
-        toolbarHeight: 80,
-        title: Container(
-          // margin: const EdgeInsets.symmetric(horizontal: 10),
-          child: Row(
-            children: [
-              RandomAvatar(widget.svg, height: 45, width: 45),
-              const SizedBox(width: 15),
-              Text(
-                widget.name,
-                style: GoogleFonts.archivo(color: Colors.white, fontSize: 20),
-              )
-            ],
-          ),
-        ),
-        leading: GestureDetector(
-            onTap: () => Navigator.pop(context),
-            child: const Icon(Icons.arrow_back_outlined, color: Colors.white)),
-        backgroundColor: HexColor("#262630"),
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(
-            bottom: Radius.circular(30),
-          ),
+        title: Row(
+          children: [
+            RandomAvatar(widget.svg, height: 40, width: 40),
+            const SizedBox(width: 12),
+            Text(widget.name),
+          ],
         ),
       ),
       body: Container(
-        padding: const EdgeInsets.all(20),
-        child: Stack(
-          children: [
-            SizedBox(
-                height: MediaQuery.of(context).size.height / 1.5,
-                child: paginate()),
-            // SizedBox(
-            //   height: MediaQuery.of(context).size.height/1.5,
-            //     child: chatList()
-            // ),
-            Container(
-              alignment: Alignment.bottomCenter,
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 4,
-                    child: Container(
-                      height: 50,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      decoration: BoxDecoration(
-                          color: HexColor("#262630"),
-                          borderRadius: const BorderRadius.horizontal(
-                              left: Radius.circular(10))),
-                      child: TextFormField(
-                          style: GoogleFonts.archivo(color: Colors.white),
-                          controller: _messageController,
-                          decoration: InputDecoration(
-                            hintText: "Write a message",
-                            hintStyle: GoogleFonts.archivo(),
-                            border: InputBorder.none,
-                            focusedBorder: InputBorder.none,
-                            enabledBorder: InputBorder.none,
-                            errorBorder: InputBorder.none,
-                            disabledBorder: InputBorder.none,
-                          )),
-                    ),
-                  ),
-                  Expanded(
-                    flex: 1,
-                    child: GestureDetector(
-                      onTap: () {
-                        sendMessage();
-                      },
-                      child: Container(
-                        height: 50,
-                        decoration: BoxDecoration(
-                            // color: HexColor("#d7dfa3"),
-                            color: HexColor("#1d1d29"),
-                            // color: HexColor("#262630"),
-                            borderRadius: const BorderRadius.horizontal(
-                                right: Radius.circular(10))),
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: const Icon(
-                          Icons.send,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  )
-                ],
-              ),
-            )
-          ],
+        decoration: const BoxDecoration(
+          image: DecorationImage(
+            image: AssetImage("assets/images/bg.png"),
+            fit: BoxFit.contain,
+          ),
+        ),
+        child: Chat(
+          messages: _messages,
+          onSendPressed: _handleSendPressed,
+          user: _user,
+          onAttachmentPressed: _handleAttachmentPressed,
+          onMessageTap: _handleMessageTap,
+          theme: DefaultChatTheme(
+            backgroundColor: Colors.transparent,
+            inputBackgroundColor: Colors.grey[800]!,
+            
+            secondaryColor: Colors.grey[700]!,
+           
+          ),
+          customMessageBuilder: (types.Message message, {required int messageWidth}) {
+            if (message is types.FileMessage) {
+              return _buildFileMessagePreview(message);
+            }
+            if (message is types.CustomMessage) {
+              // Handle custom messages if needed
+              return _buildCustomMessagePreview(message);
+            }
+            return const SizedBox.shrink();
+          },
         ),
       ),
     );
   }
-}
 
-class MessageTile extends StatefulWidget {
+  Widget _buildFileMessagePreview(types.FileMessage message) {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.grey[800]!.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.insert_drive_file, color: Colors.white),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message.name,
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                Text(
+                  '${(message.size / 1024 / 1024).toStringAsFixed(2)} MB',
+                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.download, color: Colors.white),
+            onPressed: () => _handleMessageTap(context, message),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCustomMessagePreview(types.CustomMessage message) {
+    // Handle custom messages if needed
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.grey[800]!.withOpacity(0.8),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: const Text(
+        'Custom Message',
+        style: TextStyle(color: Colors.white),
+      ),
+    );
+  }
+}
+class MessageTile extends StatelessWidget {
   final String message;
   final bool sentByLocalUser;
   final DateTime time;
@@ -261,236 +407,181 @@ class MessageTile extends StatefulWidget {
   final String roomId;
   final String chatId;
   final bool seen;
-  const MessageTile(
-      {required this.chatId,
-      required this.seen,
-      required this.roomId,
-      required this.message,
-      required this.sentByLocalUser,
-      required this.time,
-      required this.deleted,
-      super.key});
+  final bool isFile;
+  final bool isImage;
+  final String? fileName;
+  final String? fileUrl;
+  final String? imageUrl;
+  final Function(String, String, bool) onDelete;
 
-  @override
-  State<MessageTile> createState() => _MessageTileState();
-}
-
-class _MessageTileState extends State<MessageTile> {
-  bool onTap = false;
-  final DatabaseMethods _database = DatabaseMethods();
+  const MessageTile({
+    super.key,
+    required this.chatId,
+    required this.seen,
+    required this.roomId,
+    required this.message,
+    required this.sentByLocalUser,
+    required this.time,
+    required this.deleted,
+    required this.onDelete,
+    this.isFile = false,
+    this.isImage = false,
+    this.fileName,
+    this.fileUrl,
+    this.imageUrl,
+  });
 
   @override
   Widget build(BuildContext context) {
-    // return Row(
-    //   mainAxisAlignment: widget.sentByLocalUser ? MainAxisAlignment.end : MainAxisAlignment.start,
-    //   children: [
-    //     if(onTap) GestureDetector(
-    //       onTap: () async{
-    //         await _database.updateDeleted(widget.roomId, widget.chatId, true).then((val){
-    //           print("successfully deleted");
-    //           setState(() {
-    //             onTap = !onTap;
-    //           });
-    //         });
-    //       },
-    //         child: const Icon(Icons.delete_forever, color: Colors.white,
-    //         )),
-    //     if(onTap) const SizedBox(width: 5),
-    //     Column(
-    //       children: [
-    //         GestureDetector(
-    //           onTap: (){
-    //             if(widget.sentByLocalUser && !widget.deleted){
-    //               setState(() {
-    //                 onTap = !onTap;
-    //               });
-    //             }
-    //           },
-    //           child: Align(
-    //             alignment: widget.sentByLocalUser ? Alignment.centerRight : Alignment.centerLeft,
-    //             child: Container(
-    //               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-    //               margin: const EdgeInsets.symmetric(vertical: 5),
-    //               decoration: BoxDecoration(
-    //                 borderRadius: widget.sentByLocalUser ? const BorderRadius.only(
-    //                     topLeft: Radius.circular(15),
-    //                     topRight: Radius.circular(15),
-    //                     bottomLeft: Radius.circular(15)
-    //                 ) : const BorderRadius.only(
-    //                     topLeft: Radius.circular(15),
-    //                     topRight: Radius.circular(15),
-    //                     bottomRight: Radius.circular(15)
-    //                 ),
-    //                   color: widget.sentByLocalUser ? HexColor("#5953ff") : HexColor("#2e333d")
-    //               ),
-    //               child: Column(
-    //                 crossAxisAlignment: widget.sentByLocalUser ? CrossAxisAlignment.start : CrossAxisAlignment.end,
-    //                 children: [
-    //                   Row(
-    //                     mainAxisSize: MainAxisSize.min,
-    //                     children: [
-    //                       if(widget.deleted) const Icon(Icons.disabled_by_default_outlined, color: Colors.white54,),
-    //                       Text(
-    //                         widget.deleted ?  "This message has been deleted" : widget.message,
-    //                         overflow: TextOverflow.visible,
-    //                         maxLines: null,
-    //                         style: GoogleFonts.archivo(
-    //                           color: widget.deleted ? Colors.white54 : Colors.white,
-    //                           fontSize: widget.deleted ? 14 : 16,
-    //                           fontStyle: widget.deleted ? FontStyle.italic : FontStyle.normal
-    //                         ),
-    //                       ),
-    //                     ],
-    //                   ),
-    //                   Row(
-    //                     children: [
-    //                       Text(
-    //                         DateFormat("HH:mm").format(widget.time),
-    //                         style: GoogleFonts.archivo(
-    //                           color: Colors.white,
-    //                           fontSize: 10
-    //                         ),
-    //                       ),
-    //                       const SizedBox(width: 5),
-    //                       Icon(
-    //                           FontAwesomeIcons.check,
-    //                         color: (widget.seen == false) ? Colors.white : Colors.lightBlueAccent,
-    //                         size: 12,
-    //                       )
-    //                     ],
-    //                   ),
-    //                 ],
-    //               ),
-    //             ),
-    //           ),
-    //         ),
-    //         const SizedBox(height: 5)
-    //       ],
-    //     ),
-    //   ],
-    // );
-
-    return Row(
-      mainAxisAlignment: widget.sentByLocalUser
-          ? MainAxisAlignment.end
-          : MainAxisAlignment.start,
-      children: [
-        if (onTap)
-          GestureDetector(
-              onTap: () async {
-                await _database
-                    .updateDeleted(widget.roomId, widget.chatId, true)
-                    .then((val) {
-                  print("successfully deleted");
-                  setState(() {
-                    onTap = !onTap;
-                  });
-                });
-              },
-              child: const Icon(
-                Icons.delete_forever,
-                color: Colors.white,
-              )),
-        if (onTap) const SizedBox(width: 5),
-        Column(
-          children: [
-            GestureDetector(
-              onTap: () {
-                if (widget.sentByLocalUser && !widget.deleted) {
-                  setState(() {
-                    onTap = !onTap;
-                  });
-                }
-              },
-              child: Align(
-                alignment: widget.sentByLocalUser
-                    ? Alignment.centerRight
-                    : Alignment.centerLeft,
-                child: Container(
-                  constraints: BoxConstraints(
-                    maxWidth: MediaQuery.of(context).size.width *
-                        0.80, // 90% of screen width
-                  ),
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  margin: const EdgeInsets.symmetric(vertical: 5),
-                  decoration: BoxDecoration(
-                      borderRadius: widget.sentByLocalUser
-                          ? const BorderRadius.only(
-                              topLeft: Radius.circular(15),
-                              topRight: Radius.circular(15),
-                              bottomLeft: Radius.circular(15))
-                          : const BorderRadius.only(
-                              topLeft: Radius.circular(15),
-                              topRight: Radius.circular(15),
-                              bottomRight: Radius.circular(15)),
-                      color: widget.sentByLocalUser
-                          ? HexColor("#5953ff")
-                          : HexColor("#2e333d")),
-                  child: Column(
-                    crossAxisAlignment: widget.sentByLocalUser
-                        ? CrossAxisAlignment.start
-                        : CrossAxisAlignment.end,
-                    children: [
-                     widget.deleted ? Row(
-                       children: [
-                         const Icon(Icons.disabled_by_default_outlined, color: Colors.white54,),
-                         const SizedBox(width: 5),
-                         Text(
-                           "This message has been deleted",
-                            overflow: TextOverflow.visible,
-                            maxLines: null,
-                            style: GoogleFonts.archivo(
-                                color: Colors.white54,
-                                fontSize: 13,
-                                fontStyle: widget.deleted
-                                    ? FontStyle.italic
-                                    : FontStyle.normal),
-                          ),
-                       ],
-                     ) : Text(
-                        widget.message,
-                        overflow: TextOverflow.visible,
-                        maxLines: null,
-                        style: GoogleFonts.archivo(
-                            color:
-                            widget.deleted ? Colors.white54 : Colors.white,
-                            fontSize: widget.deleted ? 14 : 16,
-                            fontStyle: widget.deleted
-                                ? FontStyle.italic
-                                : FontStyle.normal),
-                      ),
-                      const SizedBox(height: 3),
-                      SizedBox(
-                        // width: MediaQuery.of(context).size.width,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              DateFormat("HH:mm").format(widget.time),
-                              style: GoogleFonts.archivo(
-                                  color: Colors.white, fontSize: 10),
-                            ),
-                            const SizedBox(width: 5),
-                            Icon(
-                              FontAwesomeIcons.check,
-                              color: (widget.seen == false)
-                                  ? Colors.white
-                                  : Colors.lightBlueAccent,
-                              size: 12,
-                            )
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
+    return Align(
+      alignment: sentByLocalUser ? Alignment.centerRight : Alignment.centerLeft,
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxWidth: MediaQuery.of(context).size.width * 0.80,
+        ),
+        child: Card(
+          color: sentByLocalUser ? HexColor("#5953ff") : HexColor("#2e333d"),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.only(
+              topLeft: const Radius.circular(15),
+              topRight: const Radius.circular(15),
+              bottomLeft: Radius.circular(sentByLocalUser ? 15 : 5),
+              bottomRight: Radius.circular(sentByLocalUser ? 5 : 15),
             ),
-            const SizedBox(height: 5)
-          ],
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildMessageContent(context),
+                const SizedBox(height: 4),
+                _buildMessageMeta(),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildMessageContent(BuildContext context) {
+    if (deleted) {
+      return _buildDeletedMessage();
+    } else if (isImage && imageUrl != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(8),
+            child: Image.network(
+              imageUrl!,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return const Center(child: CircularProgressIndicator());
+              },
+            ),
+          ),
+        ],
+      );
+    } else {
+      return _buildRegularMessage();
+    }
+  }
+
+  Widget _buildDeletedMessage() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        const Icon(Icons.disabled_by_default_outlined, color: Colors.white54, size: 16),
+        const SizedBox(width: 5),
+        Text(
+          "This message has been deleted",
+          style: GoogleFonts.archivo(
+            color: Colors.white54,
+            fontSize: 13,
+            fontStyle: FontStyle.italic,
+          ),
         ),
       ],
+    );
+  }
+
+ Widget _buildRegularMessage() {
+    return GestureDetector(
+      onLongPress: sentByLocalUser && !deleted ? _showDeleteDialog : null,
+      child: isFile
+          ? Row(
+              children: [
+                const Icon(Icons.file_present, color: Colors.white),
+                const SizedBox(width: 8),
+                Flexible(
+                  child: Text(
+                    message,
+                    style: GoogleFonts.archivo(
+                      color: Colors.white,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+              ],
+            )
+          : Text(
+              message,
+              style: GoogleFonts.archivo(
+                color: Colors.white,
+                fontSize: 16,
+              ),
+            ),
+    );
+  }
+
+
+  Widget _buildMessageMeta() {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          DateFormat("HH:mm").format(time),
+          style: GoogleFonts.archivo(
+            color: Colors.white70,
+            fontSize: 10,
+          ),
+        ),
+        const SizedBox(width: 5),
+        if (sentByLocalUser) _buildSeenIndicator(),
+      ],
+    );
+  }
+
+  Widget _buildSeenIndicator() {
+    return Icon(
+      FontAwesomeIcons.check,
+      color: seen ? Colors.lightBlueAccent : Colors.white70,
+      size: 12,
+    );
+  }
+
+  void _showDeleteDialog() {
+    showDialog(
+      context: GlobalKey<NavigatorState>().currentState!.context,
+      builder: (context) => AlertDialog(
+        title: Text('Delete Message', style: GoogleFonts.archivo()),
+        content: Text('Are you sure you want to delete this message?', style: GoogleFonts.archivo()),
+        actions: [
+          TextButton(
+            child: Text('Cancel', style: GoogleFonts.archivo()),
+            onPressed: () => Navigator.of(context).pop(),
+          ),
+          TextButton(
+            child: Text('Delete', style: GoogleFonts.archivo(color: Colors.red)),
+            onPressed: () {
+              onDelete(roomId, chatId, true);
+              Navigator.of(context).pop();
+            },
+          ),
+        ],
+      ),
     );
   }
 }

@@ -1,12 +1,15 @@
 import 'package:chat_app/services/auth.dart';
-import 'package:chat_app/services/authenticate.dart';
 import 'package:chat_app/services/database.dart';
 import 'package:chat_app/services/helper.dart';
+import 'package:chat_app/views/auth/login_page.dart';
 import 'package:chat_app/views/components/create_group.dart';
 import 'package:chat_app/views/components/search.dart';
+import 'package:chat_app/views/welcome_screen.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hexcolor/hexcolor.dart';
+import 'package:intl/intl.dart';
 import 'package:random_avatar/random_avatar.dart';
 
 import '../../services/constants.dart';
@@ -14,8 +17,12 @@ import 'conversation.dart';
 import 'forgotp.dart';
 import 'gc_conversation.dart';
 
+enum ChatViewType { chats, groups }
+
 class ChatRoom extends StatefulWidget {
-  const ChatRoom({super.key});
+  final UserType userType;
+  
+  const ChatRoom({super.key, required this.userType});
 
   @override
   State<ChatRoom> createState() => _ChatRoomState();
@@ -25,402 +32,550 @@ class _ChatRoomState extends State<ChatRoom> {
   final DatabaseMethods _database = DatabaseMethods();
   final AuthMethods _auth = AuthMethods();
   final Helper _helper = Helper();
+  
   Stream? chatRoomStream;
   Stream? gcStream;
-  String dropdownValue = "Chats";
+  ChatViewType _currentView = ChatViewType.chats;
+  bool _isLoading = true;
+  String? _errorMessage;
 
   @override
   void initState() {
-    getUserData();
     super.initState();
+    _initializeUserData();
   }
 
-  getUserData() async {
-    String? name;
-    String? email;
-    String? svg;
-
-    await _helper.getName().then((val) {
-      name = val;
-    });
-    await _helper.getEmail().then((val) {
-      email = val;
-    });
-    print("debugger2");
-    await _helper.getSvg().then((val) {
-      svg = val;
-    });
-    print(svg);
-    Constants.localUsername = name!;
-    Constants.localEmail = email!;
-    Constants.localSvg = svg!;
-
-    await _database.getChatRooms(Constants.localUsername).then((val) {
+  Future<void> _initializeUserData() async {
+    try {
+      await _loadUserProfile();
+      await _loadChatStreams();
+      
       setState(() {
-        chatRoomStream = val;
-        print(val);
+        _isLoading = false;
       });
-    });
-    await _database.getGCs(Constants.localUsername).then((val) {
+    } catch (e) {
       setState(() {
-        gcStream = val;
-        print(val);
-        print("got gc's data");
+        _isLoading = false;
+        _errorMessage = 'Failed to initialize: ${e.toString()}';
       });
-    });
-    // print(Constants.localUsername);
+    }
+  }
+
+  Future<void> _loadUserProfile() async {
+    final name = await _helper.getName();
+    final email = await _helper.getEmail();
+    final svg = await _helper.getSvg();
+
+    if (name == null || email == null || svg == null) {
+      throw Exception('Failed to load user profile data');
+    }
+
+    Constants.localUsername = name;
+    Constants.localEmail = email;
+    Constants.localSvg = svg;
+  }
+
+  Future<void> _loadChatStreams() async {
+    chatRoomStream = await _database.getChatRooms(Constants.localUsername);
+    gcStream = await _database.getGCs(Constants.localUsername);
+  }
+
+  Future<void> _handleSignOut() async {
+    try {
+      await _auth.signOut();
+      await _helper.setLogStatus(false);
+      await _helper.setName("");
+      await _helper.setSvg("");
+      await _helper.setEmail("");
+      
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+            builder: (context) => const WelcomeScreen(),
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to sign out: ${e.toString()}')),
+      );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Constants.backgroundColor,
-      drawer: Drawer(
-        child: Container(
-          decoration: BoxDecoration(color: HexColor("#262630")),
-          child: Column(
-            children: [
-              const SizedBox(
-                height: 30,
-              ),
-              Container(
-                margin: const EdgeInsets.symmetric(vertical: 20),
-                child: RandomAvatar(Constants.localSvg,
-                    height: MediaQuery.of(context).size.width / 2,
-                    width: MediaQuery.of(context).size.width / 2),
-              ),
-              Text(
-                Constants.localUsername,
-                style: GoogleFonts.archivo(color: Colors.white, fontSize: 25),
-              ),
-              Text(
-                Constants.localEmail,
-                style: GoogleFonts.archivo(color: Colors.white, fontSize: 18),
-              ),
-              const SizedBox(height: 30),
-              GestureDetector(
-                onTap: () => Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                        builder: (context) =>
-                            ForgotPassword(email: Constants.localEmail))),
-                child: Align(
-                  alignment: Alignment.center,
-                  child: Container(
-                    width: MediaQuery.of(context).size.width / 1.5,
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 10),
-                    decoration: BoxDecoration(
-                        color: HexColor("#5953ff"),
-                        borderRadius: BorderRadius.circular(10)),
-                    child: Align(
-                      alignment: Alignment.center,
-                      child: Text(
-                        "Forgot password?",
-                        style: GoogleFonts.archivo(
-                            color: Colors.white, fontSize: 20),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-      appBar: AppBar(
-        iconTheme: const IconThemeData(
-          color: Colors.white, // Change the color here
-        ),
-        title: Text(
-          "Chat Rooms",
-          style: GoogleFonts.archivo(color: Colors.white, fontSize: 20),
-        ),
-        toolbarHeight: 70,
-        backgroundColor: Constants.backgroundColor,
-        actions: [
-          IconButton(
-            onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(
-                    builder: (context) => CreateGroup(
-                        // stream: chatRoomStream,
-                        ))),
-            icon: const Icon(Icons.add),
-            color: Colors.white,
-            tooltip: "Add new group",
-          ),
-          GestureDetector(
-            onTap: () {
-              _auth.signOut();
-              _helper.setLogStatus(false);
-              _helper.setName("");
-              _helper.setSvg("");
-              _helper.setEmail("");
-              Navigator.pushReplacement(
-                  context,
-                  MaterialPageRoute(
-                      builder: (context) => const Authenticate()));
-            },
-            child: Container(
-              margin: const EdgeInsets.symmetric(horizontal: 15, vertical: 10),
-              child: const Icon(
-                Icons.logout,
-                color: Colors.white,
-              ),
-            ),
-          )
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => Navigator.push(
-            context, MaterialPageRoute(builder: (context) => const Search())),
-        backgroundColor: HexColor("#5953ff"),
-        child: const Icon(Icons.search, color: Colors.white),
-      ),
-      body: Container(
-        // margin: const EdgeInsets.symmetric(horizontal: 25, vertical: 15),
+      drawer: _buildDrawer(context),
+      appBar: _buildAppBar(context),
+      floatingActionButton: widget.userType == UserType.student ? _buildFloatingActionButton(context) : null,
+      body: _buildBody(),
+    );
+  }
+
+  Widget _buildDrawer(BuildContext context) {
+    return Drawer(
+      child: Container(
+        decoration: BoxDecoration(color: HexColor("#262630")),
         child: Column(
           children: [
-            Container(
-              margin: const EdgeInsets.only(left: 25),
-              alignment: Alignment.centerLeft,
-              child: DropdownButtonHideUnderline(
-                child: DropdownButton<String>(
-                  value: dropdownValue,
-                  icon: const Icon(Icons.arrow_drop_down),
-                  dropdownColor: HexColor("#262630"),
-                  style: GoogleFonts.archivo(fontSize: 14),
-                  onChanged: (String? newValue) {
-                    setState(() {
-                      dropdownValue = newValue!;
-                      print(dropdownValue);
-                    });
-                  },
-                  items: <String>['Chats', 'GCs']
-                      .map<DropdownMenuItem<String>>((String value) {
-                    return DropdownMenuItem<String>(
-                      value: value,
-                      child: Text(
-                        value,
-                        style: GoogleFonts.poppins(color: Colors.white),
-                      ),
-                    );
-                  }).toList(),
-                ),
-              ),
-            ),
-            // const SizedBox(height: 10),
-            SizedBox(
-                height: MediaQuery.of(context).size.height * .7,
-                child: dropdownValue == "Chats" ? chatRoomList() : gcList()
-            )
+            const SizedBox(height: 30),
+            _buildProfileAvatar(),
+            _buildProfileInfo(),
+            const SizedBox(height: 30),
+            _buildForgotPasswordButton(context),
           ],
         ),
       ),
     );
   }
 
-  Widget chatRoomList() {
-    return StreamBuilder(
-        stream: chatRoomStream,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-
-          if (snapshot.hasError) {
-            return Center(
-                child: Text(
-              'Error: ${snapshot.error}',
-              style: GoogleFonts.archivo(color: Colors.red),
-            ));
-          }
-
-          if (!snapshot.hasData) {
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 30),
-              child: Center(
-                  child: Text(
-                'No chats rooms found, please create a chat room by searching for a user',
-                    // : "No GCs found, please click on the + button to make a new GC",
-                style: GoogleFonts.archivo(color: Colors.white60),
-              )),
-            );
-          }
-          return ListView.builder(
-            shrinkWrap: true,
-            itemCount: snapshot.data.docs.length,
-            itemBuilder: (context, index) {
-              return ChatRoomTile(
-                unreadMessages:
-                    ((snapshot.data.docs[index].data())["unreadMessages"] !=
-                            null)
-                        ? (snapshot.data.docs[index].data())["unreadMessages"]
-                            [Constants.localUsername.toString()]
-                        : 0,
-                username: (Constants.localUsername !=
-                        (snapshot.data.docs[index].data())["users"][0])
-                    ? (snapshot.data.docs[index].data())["users"][0]
-                    : (snapshot.data.docs[index].data())["users"][1],
-                roomId: (snapshot.data.docs[index].data())["chatRoomId"],
-                svg: (Constants.localSvg !=
-                        (snapshot.data.docs[index].data())["userSvg"][0])
-                    ? (snapshot.data.docs[index].data())["userSvg"][0]
-                    : (snapshot.data.docs[index].data())["userSvg"][1],
-              );
-            },
-          );
-        });
+  Widget _buildProfileAvatar() {
+    return Container(
+      margin: const EdgeInsets.symmetric(vertical: 20),
+      child: Constants.localSvg.isNotEmpty
+          ? RandomAvatar(
+              Constants.localSvg,
+              height: MediaQuery.of(context).size.width / 2,
+              width: MediaQuery.of(context).size.width / 2,
+            )
+          : CircleAvatar(
+              radius: MediaQuery.of(context).size.width / 4,
+              backgroundColor: Colors.grey,
+              child: Icon(Icons.person, size: MediaQuery.of(context).size.width / 4, color: Colors.white),
+            ),
+    );
   }
 
+  Widget _buildProfileInfo() {
+    return Column(
+      children: [
+        Text(
+          Constants.localUsername,
+          style: GoogleFonts.archivo(color: Colors.white, fontSize: 25),
+        ),
+        Text(
+          Constants.localEmail,
+          style: GoogleFonts.archivo(color: Colors.white, fontSize: 18),
+        ),
+      ],
+    );
+  }
 
+  Widget _buildForgotPasswordButton(BuildContext context) {
+    return GestureDetector(
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ForgotPassword(email: Constants.localEmail),
+        ),
+      ),
+      child: Container(
+        width: MediaQuery.of(context).size.width / 1.5,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+        decoration: BoxDecoration(
+          color: HexColor("#5953ff"),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Text(
+          "Forgot password?",
+          style: GoogleFonts.archivo(color: Colors.white, fontSize: 20),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
 
+  PreferredSizeWidget _buildAppBar(BuildContext context) {
+    return AppBar(
+      iconTheme: const IconThemeData(color: Colors.white),
+      title: Text(
+        widget.userType == UserType.teacher
+            ? "Teachers Chat Rooms"
+            : "Students Chat Rooms",
+        style: GoogleFonts.archivo(color: Colors.white, fontSize: 20),
+      ),
+      toolbarHeight: 70,
+      backgroundColor: Constants.backgroundColor,
+      actions: [
+        if (widget.userType == UserType.teacher)
+          IconButton(
+            onPressed: () => _navigateToCreateGroup(),
+            icon: const Icon(Icons.add),
+            color: Colors.white,
+            tooltip: "Add new group",
+          ),
+        IconButton(
+          onPressed: _handleSignOut,
+          icon: const Icon(Icons.logout),
+          color: Colors.white,
+          tooltip: "Sign out",
+        ),
+      ],
+    );
+  }
 
+  Widget _buildFloatingActionButton(BuildContext context) {
+    return FloatingActionButton(
+      onPressed: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const Search()),
+      ),
+      backgroundColor: HexColor("#5953ff"),
+      child: const Icon(Icons.search, color: Colors.white),
+    );
+  }
 
-  Widget gcList() {
-    return StreamBuilder(
-        stream: gcStream,
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
+    }
 
-          if (snapshot.hasError) {
-            return Center(
-                child: Text(
-              'Error: ${snapshot.error}',
-              style: GoogleFonts.archivo(color: Colors.red),
-            ));
-          }
+    if (_errorMessage != null) {
+      return Center(
+        child: Text(
+          _errorMessage!,
+          style: GoogleFonts.archivo(color: Colors.red),
+        ),
+      );
+    }
 
-          if (!snapshot.hasData) {
-            return Container(
-              margin: const EdgeInsets.symmetric(horizontal: 30),
-              child: Center(
-                  child: Text(
-                'No GCs found, please create a GC by click on the + icon',
-                    // : "No GCs found, please click on the + button to make a new GC",
-                style: GoogleFonts.archivo(color: Colors.white60),
-              )),
+    return Column(
+      children: [
+        _buildViewToggle(),
+        Expanded(
+          child: _currentView == ChatViewType.chats
+              ? _buildChatList()
+              : _buildGroupList(),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildViewToggle() {
+    return Container(
+      margin: const EdgeInsets.only(left: 25),
+      alignment: Alignment.centerLeft,
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<ChatViewType>(
+          value: _currentView,
+          dropdownColor: HexColor("#262630"),
+          style: GoogleFonts.archivo(fontSize: 14),
+          onChanged: (ChatViewType? newValue) {
+            if (newValue != null) {
+              setState(() => _currentView = newValue);
+            }
+          },
+          items: ChatViewType.values.map((ChatViewType type) {
+            return DropdownMenuItem<ChatViewType>(
+              value: type,
+              child: Text(
+                type == ChatViewType.chats ? 'Chats' : 'Groups',
+                style: GoogleFonts.poppins(color: Colors.white),
+              ),
             );
-          }
-          return ListView.builder(
-            shrinkWrap: true,
-            itemCount: snapshot.data.docs.length,
-            itemBuilder: (context, index) {
-              return GCTile(
-                createdAt: (snapshot.data.docs[index].data())["createdAt"],
-                createdBy: (snapshot.data.docs[index].data())["createdBy"],
-                gcName: (snapshot.data.docs[index].data())["gcName"],
-                svg: (snapshot.data.docs[index].data())["svg"],
-                userData: (snapshot.data.docs[index].data())["data"],
-                groupMembers: (snapshot.data.docs[index].data())["users"],
-                gcId: (snapshot.data.docs[index].id),
-              );
-            },
+          }).toList(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChatList() {
+    return StreamBuilder(
+      stream: chatRoomStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return _buildErrorMessage(snapshot.error.toString());
+        }
+
+        if (!snapshot.hasData || snapshot.data.docs.isEmpty) {
+          return _buildEmptyListMessage(
+            "No chat rooms found. Create a chat room by searching for a user.",
           );
-        });
+        }
+
+        return ListView.builder(
+  itemCount: snapshot.data.docs.length,
+  itemBuilder: (context, index) => ChatRoomTile(
+    unreadMessages: snapshot.data.docs[index].data()["unreadMessages"]
+        ?[Constants.localUsername.toString()] ?? 0,
+    username: _getOtherUsername(
+      snapshot.data.docs[index].data()["users"],
+    ),
+    roomId: snapshot.data.docs[index].data()["chatRoomId"],
+    svg: _getOtherUserSvg(
+      snapshot.data.docs[index].data()["userSvg"],
+    ),
+    userType: widget.userType, // Add this line
+  ),
+);
+      },
+    );
+  }
+
+  Widget _buildGroupList() {
+    return StreamBuilder(
+      stream: gcStream,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return _buildErrorMessage(snapshot.error.toString());
+        }
+
+        if (!snapshot.hasData || snapshot.data.docs.isEmpty) {
+          return _buildEmptyListMessage(
+            "No group chats found. Create a group chat by clicking the + icon.",
+          );
+        }
+
+        return ListView.builder(
+          itemCount: snapshot.data.docs.length,
+          itemBuilder: (context, index) => GCTile(
+            userType: widget.userType,
+            createdAt: snapshot.data.docs[index].data()["createdAt"],
+            createdBy: snapshot.data.docs[index].data()["createdBy"],
+            gcName: snapshot.data.docs[index].data()["gcName"],
+            svg: snapshot.data.docs[index].data()["svg"],
+            userData: snapshot.data.docs[index].data()["data"],
+            groupMembers: snapshot.data.docs[index].data()["users"],
+            gcId: snapshot.data.docs[index].id,
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildErrorMessage(String error) {
+    return Center(
+      child: Text(
+        'Error: $error',
+        style: GoogleFonts.archivo(color: Colors.red),
+      ),
+    );
+  }
+
+  Widget _buildEmptyListMessage(String message) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 30),
+      child: Center(
+        child: Text(
+          message,
+          style: GoogleFonts.archivo(color: Colors.white60),
+          textAlign: TextAlign.center,
+        ),
+      ),
+    );
+  }
+
+  void _navigateToCreateGroup() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CreateGroup(userType: widget.userType),
+      ),
+    );
+  }
+
+  String _getOtherUsername(List<dynamic> users) {
+    return users.firstWhere(
+      (user) => user != Constants.localUsername,
+      orElse: () => "Unknown User",
+    );
+  }
+
+  String _getOtherUserSvg(List<dynamic> userSvgs) {
+    return userSvgs.firstWhere(
+      (svg) => svg != Constants.localSvg,
+      orElse: () => "",
+    );
   }
 }
 
 class ChatRoomTile extends StatelessWidget {
   final String? username;
-  final String? email;
   final String? roomId;
   final String? svg;
   final int? unreadMessages;
-  const ChatRoomTile(
-      {required this.unreadMessages,
-      required this.username,
-      this.email,
-      required this.roomId,
-      required this.svg,
-      super.key});
+  final UserType userType;
+
+  const ChatRoomTile({
+    super.key,
+    required this.unreadMessages,
+    required this.username,
+    required this.roomId,
+    required this.svg,
+    required this.userType,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) =>
-                    Conversation(roomId: roomId, name: username, svg: svg)));
-      },
-      child: Column(
-        children: [
-          Row(
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection("conversations")
+          .doc("${Constants.localUsername}_chat")
+          .collection("chats")
+          .where("receiver", whereIn: [username, Constants.localUsername])
+          .orderBy("time", descending: true)
+          .limit(1)
+          .snapshots(),
+      builder: (context, snapshot) {
+        return GestureDetector(
+          onTap: () => _navigateToConversation(context),
+          child: Column(
             children: [
-              Expanded(
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
-                  margin:
-                      const EdgeInsets.symmetric(vertical: 5, horizontal: 20),
-                  height: 65,
-                  decoration: BoxDecoration(
-                      // color: HexColor("#2b2547"),
-                      color: HexColor("#262630"),
-                      borderRadius: BorderRadius.circular(15)),
-                  child: Row(
-                    children: [
-                      Row(
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
+                margin: const EdgeInsets.symmetric(vertical: 5, horizontal: 20),
+                height: 75,
+                decoration: BoxDecoration(
+                  color: HexColor("#262630"),
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Row(
+                  children: [
+                    _buildAvatar(),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          RandomAvatar(
-                            svg!,
-                            height: 50,
-                            width: 52,
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                username!.trim(),
+                                style: GoogleFonts.archivo(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                ),
+                              ),
+                              if (snapshot.hasData && snapshot.data!.docs.isNotEmpty)
+                                Text(
+                                  _formatTime(snapshot.data!.docs.first["time"]),
+                                  style: GoogleFonts.archivo(
+                                    color: Colors.white60,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                            ],
                           ),
-                          const SizedBox(width: 14),
-                          Text(
-                            username!.trim(),
-                            style: GoogleFonts.archivo(
-                                color: Colors.white, fontSize: 20),
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: _buildLatestMessage(snapshot),
+                              ),
+                              if (unreadMessages != 0)
+                                CircleAvatar(
+                                  radius: 10,
+                                  backgroundColor: HexColor("#5953ff"),
+                                  child: Text(
+                                    unreadMessages.toString(),
+                                    style: GoogleFonts.archivo(
+                                      color: Colors.white,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
                         ],
                       ),
-                      const Spacer(),
-                      if (unreadMessages != 0)
-                        CircleAvatar(
-                          child: Container(
-                            padding: const EdgeInsets.all(6),
-                            decoration: BoxDecoration(
-                              color: HexColor("#5953ff"),
-                              borderRadius: BorderRadius.circular(50),
-                            ),
-                            child: Align(
-                              alignment: Alignment.center,
-                              child: Text(
-                                unreadMessages.toString(),
-                                style: GoogleFonts.archivo(
-                                    color: Colors.white, fontSize: 16),
-                              ),
-                            ),
-                          ),
-                        ),
-                      const SizedBox(width: 5),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-        ],
+        );
+      },
+    );
+  }
+
+  Widget _buildAvatar() {
+    return RandomAvatar(
+      svg!,
+      height: 50,
+      width: 52,
+    );
+  }
+
+  Widget _buildLatestMessage(AsyncSnapshot<QuerySnapshot> snapshot) {
+    if (snapshot.hasData && snapshot.data!.docs.isNotEmpty) {
+      final latestMessage = snapshot.data!.docs.first;
+      String messageText = '';
+
+      if (latestMessage["deleted"] == true) {
+        messageText = "This message was deleted";
+      } else if (latestMessage["isFile"] == true) {
+        messageText = "Sent a file: ${latestMessage["fileName"]}";
+      } else if (latestMessage["isImage"] == true) {
+        messageText = "Sent an image";
+      } else {
+        messageText = latestMessage["message"];
+      }
+
+      return Text(
+        messageText,
+        maxLines: 1,
+        overflow: TextOverflow.ellipsis,
+        style: GoogleFonts.archivo(
+          color: Colors.white60,
+          fontSize: 14,
+        ),
+      );
+    }
+    return Text(
+      "No messages yet",
+      style: GoogleFonts.archivo(
+        color: Colors.white60,
+        fontSize: 14,
+      ),
+    );
+  }
+
+  String _formatTime(int timestamp) {
+    final DateTime messageTime = DateTime.fromMillisecondsSinceEpoch(timestamp);
+    final DateTime now = DateTime.now();
+    final Duration difference = now.difference(messageTime);
+
+    if (difference.inDays > 7) {
+      return DateFormat('MMM d').format(messageTime);
+    } else if (difference.inDays > 0) {
+      return DateFormat('E').format(messageTime);
+    } else {
+      return DateFormat('HH:mm').format(messageTime);
+    }
+  }
+
+  void _navigateToConversation(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => Conversation(
+          roomId: roomId!,
+          svg: svg!,
+          name: username!,
+        ),
       ),
     );
   }
 }
 
-
-
-
-
-
 class GCTile extends StatelessWidget {
   final String? gcName;
   final String? gcId;
   final String? svg;
+ final  UserType userType;
   // final Map data;
   // final int? unreadMessages;
   final Map<String, dynamic> userData;
@@ -436,7 +591,7 @@ class GCTile extends StatelessWidget {
         required this.svg,
         required this.userData,
         required this.groupMembers,
-        super.key, required this.createdBy, required this.createdAt});
+        super.key, required this.createdBy, required this.createdAt, required this.userType});
 
   @override
   Widget build(BuildContext context) {
@@ -447,6 +602,7 @@ class GCTile extends StatelessWidget {
             MaterialPageRoute(
                 builder: (context) =>
                     GCConversation(
+                      userType: userType,
                       createdBy: createdBy,
                         createdAt: createdAt,
                         svg: svg!, gcName: gcName!, data: userData, gcId: gcId!)));

@@ -1,5 +1,6 @@
 import 'package:chat_app/services/constants.dart';
 import 'package:chat_app/services/database.dart';
+import 'package:chat_app/views/auth/login_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:flutter/material.dart';
@@ -11,13 +12,14 @@ import 'package:random_avatar/random_avatar.dart';
 import 'chat_room.dart';
 
 class GCConversation extends StatefulWidget {
+  final UserType userType;
   final String gcName;
   final String svg;
   final Map data;
   final String gcId;
   final int createdAt;
   final String createdBy;
-  const GCConversation({super.key, required this.gcId, required this.svg, required this.gcName, required this.data, required this.createdAt, required this.createdBy});
+  const GCConversation({super.key, required this.gcId, required this.svg, required this.gcName, required this.data, required this.createdAt, required this.createdBy, required this.userType});
 
   @override
   State<GCConversation> createState() => _GCConversationState();
@@ -225,7 +227,7 @@ class _GCConversationState extends State<GCConversation> {
         ),
         leading: GestureDetector(
             onTap: () => Navigator.pushReplacement(
-              context, MaterialPageRoute(builder: (context) => const ChatRoom())),
+              context, MaterialPageRoute(builder: (context) =>  ChatRoom(userType:widget.userType ,))),
             child: const Icon(Icons.arrow_back_outlined, color: Colors.white)),
         backgroundColor: HexColor("#262630"),
         shape: const RoundedRectangleBorder(

@@ -1,5 +1,6 @@
 import 'package:chat_app/services/constants.dart';
 import 'package:chat_app/services/database.dart';
+import 'package:chat_app/views/auth/login_page.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -10,7 +11,8 @@ import 'dart:math';
 import 'gc_conversation.dart';
 
 class CreateGroup extends StatefulWidget {
-  CreateGroup({super.key});
+  final UserType userType;
+  const CreateGroup({super.key, required this.userType});
   @override
   State<CreateGroup> createState() => _CreateGroupState();
 }
@@ -28,6 +30,7 @@ class _CreateGroupState extends State<CreateGroup> {
   final formKey = GlobalKey<FormState>();
   Stream? chatRoomStream;
 
+  @override
   void initState() {
     getUserData();
     super.initState();
@@ -101,6 +104,7 @@ class _CreateGroupState extends State<CreateGroup> {
             context,
             MaterialPageRoute(
                 builder: (context) => GCConversation(
+                  userType: widget.userType,
                       createdBy: Constants.localUsername,
                       createdAt: DateTime.now().millisecondsSinceEpoch,
                       gcName: _groupNameController.text.trim(),
@@ -500,7 +504,7 @@ class ExistingTiles extends StatefulWidget {
   final int index;
   final VoidCallback onAdd;
 
-  ExistingTiles(
+  const ExistingTiles(
       {required this.unreadMessages,
       required this.username,
       this.email,
@@ -645,7 +649,7 @@ class _ExistingTilesState extends State<ExistingTiles> {
 class UpdateableBottomSheet extends StatefulWidget {
   final VoidCallback onAddUpdateState;
 
-  UpdateableBottomSheet({required this.onAddUpdateState});
+  const UpdateableBottomSheet({super.key, required this.onAddUpdateState});
   @override
   _UpdateableBottomSheetState createState() => _UpdateableBottomSheetState();
 }

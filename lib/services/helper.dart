@@ -2,6 +2,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 class Helper{
 
+  static String userTypeKey = "USER_TYPE";
+
+  Future<void> setUserType(String userType) async {
+    await SharedPreferences.getInstance()
+        .then((prefs) => prefs.setString(userTypeKey, userType));
+  }
+
+  Future<String?> getUserType() async {
+    return await SharedPreferences.getInstance()
+        .then((prefs) => prefs.getString(userTypeKey));
+  }
+
   Future<bool> setLogStatus(bool logStatus) async{
     SharedPreferences saveLogStatus = await SharedPreferences.getInstance();
     return await saveLogStatus.setBool("log", logStatus);
@@ -43,5 +55,6 @@ class Helper{
     SharedPreferences saveEmail = await SharedPreferences.getInstance();
     return saveEmail.getString("svg");
   }
+  
 
 }

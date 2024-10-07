@@ -1,6 +1,7 @@
 import 'package:chat_app/services/auth.dart';
 import 'package:chat_app/services/constants.dart';
 import 'package:chat_app/services/database.dart';
+import 'package:chat_app/views/auth/login_page.dart';
 import 'package:chat_app/views/components/chat_room.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -9,11 +10,12 @@ import 'package:random_avatar/random_avatar.dart';
 
 import '../../services/helper.dart';
 class Avatar extends StatefulWidget {
+   final UserType userType;
   final String email;
   final String password;
   final String name;
 
-  const Avatar({super.key, required this.email, required this.password, required this.name});
+  const Avatar({super.key, required this.email, required this.password, required this.name, required this.userType});
 
   @override
   State<Avatar> createState() => _AvatarState();
@@ -122,7 +124,7 @@ class _AvatarState extends State<Avatar> {
       _helper.setSvg(svg);
       _database.uploadUserInfo(userInfo);
       print("email: ${val?.email}");
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => const ChatRoom()));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) =>  ChatRoom(userType:widget.userType,)));
     }).catchError((e){
       print(e);
       setState(() {
