@@ -55,5 +55,5 @@
 
 * [Flutter](https://flutter.dev)
 * [Firebase](https://firebase.google.com)
-* [Github.com](https://github.com/RishiAhuja)
+* [Github.com](https://github.com/deepak160080)
 * [Flat Icons](https://flaticon.com)
