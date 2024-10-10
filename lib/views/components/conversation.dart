@@ -205,7 +205,8 @@ String _sanitizeMessage(String message) {
     final linkRegex = RegExp(r'(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})');
     
     // List of abusive words (this list should be more comprehensive in a real application)
-    final abuseWords = ['abuse', 'hate', 'stupid'];
+    final abuseWords = ['address', 'phone', 'email', 'social security', 'ssn', 'bank account', 'credit card', 'debit card', 'PIN', 'password', 'username', 'login', 'passport', 'ID', 'driver\'s license', 'birthdate', 'birthday', 'first name', 'last name', 'full name', 'home address', 'work address', 'school address', 'city', 'state', 'country', 'zip code', 'postal code', 'mobile number', 'landline', 'street', 'apartment', 'user ID', 'IP address', 'security question', 'mother\'s maiden name', 'medical record', 'health info', 'insurance number', 'social media', 'Facebook', 'Instagram', 'Twitter', 'TikTok', 'LinkedIn', 'Snapchat', 'YouTube', 'WhatsApp', 'Telegram', 'Discord']
+;
 
     // Replace phone numbers
     message = message.replaceAllMapped(phoneRegex, (match) => '*' * match.group(0)!.length);
