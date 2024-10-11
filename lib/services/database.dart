@@ -1,3 +1,4 @@
+import 'package:chat_app/services/conversation_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DatabaseMethods
@@ -133,6 +134,68 @@ Stream<Map<String, dynamic>> getLastMessage(String roomId) {
   createGC(String groupName, Map<String, dynamic> userMap) async{
     return await FirebaseFirestore.instance.collection("gc").doc(groupName).set(userMap).catchError((e){
       print(e.toString());
+    });
+  }
+}
+
+
+class FirestoreService {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+
+  // Get a stream of conversations for a user
+  Stream<List<Conversation>> getConversations(String userId) {
+    return _firestore
+        .collection('conversations')
+        .where('participants', arrayContains: {'userId': userId})
+        .snapshots()
+        .map((snapshot) => snapshot.docs
+            .map((doc) => Conversation.fromFirestore(doc))
+            .toList());
+  }
+
+  // Get a stream of messages for a conversation
+  Stream<List<Message>> getMessages(String conversationId) {
+    return _firestore
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .orderBy('timestamp', descending: true)
+        .snapshots()
+        .map((snapshot) =>
+            snapshot.docs.map((doc) => Message.fromFirestore(doc)).toList());
+  }
+
+  // Send a new message
+  Future<void> sendMessage(String conversationId, Message message) async {
+    await _firestore
+        .collection('conversations')
+        .doc(conversationId)
+        .collection('messages')
+        .add(message.toMap());
+
+    // Update last message and unread count
+    await _firestore.collection('conversations').doc(conversationId).update({
+      'lastMessage': LastMessage(
+        content: message.content,
+        timestamp: message.timestamp,
+        senderId: message.senderId,
+      ).toMap(),
+      'unreadCount.${message.senderId}': FieldValue.increment(1),
+    });
+  }
+
+  // Create a new conversation
+  Future<String> createConversation(Conversation conversation) async {
+    DocumentReference docRef = await _firestore
+        .collection('conversations')
+        .add(conversation.toMap());
+    return docRef.id;
+  }
+
+  // Mark messages as read
+  Future<void> markAsRead(String conversationId, String userId) async {
+    await _firestore.collection('conversations').doc(conversationId).update({
+      'unreadCount.$userId': 0,
     });
   }
 }

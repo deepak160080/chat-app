@@ -2,7 +2,6 @@ import 'package:chat_app/services/auth.dart';
 import 'package:chat_app/services/database.dart';
 import 'package:chat_app/services/helper.dart';
 import 'package:chat_app/views/auth/login_page.dart';
-import 'package:chat_app/views/components/create_group.dart';
 import 'package:chat_app/views/components/search.dart';
 import 'package:chat_app/views/welcome_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -15,7 +14,6 @@ import 'package:random_avatar/random_avatar.dart';
 import '../../services/constants.dart';
 import 'conversation.dart';
 import 'forgotp.dart';
-import 'gc_conversation.dart';
 
 enum ChatViewType { chats, groups }
 
@@ -201,7 +199,7 @@ class _ChatRoomState extends State<ChatRoom> {
       actions: [
         if (widget.userType == UserType.teacher)
           IconButton(
-            onPressed: () => _navigateToCreateGroup(),
+            onPressed: (){},
             icon: const Icon(Icons.add),
             color: Colors.white,
             tooltip: "Add new group",
@@ -245,9 +243,7 @@ class _ChatRoomState extends State<ChatRoom> {
       children: [
         _buildViewToggle(),
         Expanded(
-          child: _currentView == ChatViewType.chats
-              ? _buildChatList()
-              : _buildGroupList(),
+          child: _buildChatList()
         ),
       ],
     );
@@ -318,40 +314,6 @@ class _ChatRoomState extends State<ChatRoom> {
     );
   }
 
-  Widget _buildGroupList() {
-    return StreamBuilder(
-      stream: gcStream,
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError) {
-          return _buildErrorMessage(snapshot.error.toString());
-        }
-
-        if (!snapshot.hasData || snapshot.data.docs.isEmpty) {
-          return _buildEmptyListMessage(
-            "No group chats found. Create a group chat by clicking the + icon.",
-          );
-        }
-
-        return ListView.builder(
-          itemCount: snapshot.data.docs.length,
-          itemBuilder: (context, index) => GCTile(
-            userType: widget.userType,
-            createdAt: snapshot.data.docs[index].data()["createdAt"],
-            createdBy: snapshot.data.docs[index].data()["createdBy"],
-            gcName: snapshot.data.docs[index].data()["gcName"],
-            svg: snapshot.data.docs[index].data()["svg"],
-            userData: snapshot.data.docs[index].data()["data"],
-            groupMembers: snapshot.data.docs[index].data()["users"],
-            gcId: snapshot.data.docs[index].id,
-          ),
-        );
-      },
-    );
-  }
 
   Widget _buildErrorMessage(String error) {
     return Center(
@@ -375,14 +337,7 @@ class _ChatRoomState extends State<ChatRoom> {
     );
   }
 
-  void _navigateToCreateGroup() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => CreateGroup(userType: widget.userType),
-      ),
-    );
-  }
+  
 
   String _getOtherUsername(List<dynamic> users) {
     return users.firstWhere(
@@ -571,100 +526,3 @@ class ChatRoomTile extends StatelessWidget {
   }
 }
 
-class GCTile extends StatelessWidget {
-  final String? gcName;
-  final String? gcId;
-  final String? svg;
- final  UserType userType;
-  // final Map data;
-  // final int? unreadMessages;
-  final Map<String, dynamic> userData;
-  final List<dynamic> groupMembers;
-  final String createdBy;
-  final int createdAt;
-  const GCTile({
-      // {required this.unreadMessages,
-        required this.gcName,
-        required this.gcId,
-        // required this.data,
-        // required this.roomId,
-        required this.svg,
-        required this.userData,
-        required this.groupMembers,
-        super.key, required this.createdBy, required this.createdAt, required this.userType});
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: () {
-        Navigator.push(
-            context,
-            MaterialPageRoute(
-                builder: (context) =>
-                    GCConversation(
-                      userType: userType,
-                      createdBy: createdBy,
-                        createdAt: createdAt,
-                        svg: svg!, gcName: gcName!, data: userData, gcId: gcId!)));
-      },
-      child: Column(
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Container(
-                  padding:
-                  const EdgeInsets.symmetric(horizontal: 10, vertical: 15),
-                  margin:
-                  const EdgeInsets.symmetric(vertical: 5, horizontal: 20),
-                  // height: 65,
-                  decoration: BoxDecoration(
-                      color: HexColor("#262630"),
-                      borderRadius: BorderRadius.circular(15)),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Row(
-                          children: [
-                            RandomAvatar(
-                                  svg!,
-                                  height: 50,
-                                  width: 52,
-                              ),
-                            const SizedBox(width: 14),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    gcName!.trim(),
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
-                                    style: GoogleFonts.archivo(
-                                        color: Colors.white, fontSize: 18),
-                                  ),
-                                  Text(
-                                    "You and ${groupMembers.length - 1} other members",
-                                    overflow: TextOverflow.ellipsis,
-                                    maxLines: 1,
-                                    style: GoogleFonts.archivo(
-                                        color: Colors.white60, fontSize: 12),
-                                  ),
-                                ],
-                              ),
-                            )
-                          ],
-                        ),
-                      ),
-                      const SizedBox(width: 5),
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
