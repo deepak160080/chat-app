@@ -52,13 +52,8 @@ class DatabaseMethods {
         .get();
   }
 
-  Future<void> conversation(String roomId, String documentName, Map<String, dynamic> userMap) async {
-    return FirebaseFirestore.instance
-        .collection("chatrooms")
-        .doc(roomId)
-        .collection("chats")
-        .doc(documentName)
-        .set(userMap);
+  conversation(String roomId, Map<String, dynamic> userMap) async {
+    return await FirebaseFirestore.instance.collection("chatrooms").doc(roomId).collection("chats").add(userMap);
   }
 
   Future<void> conversationForStudent(String roomId, String documentName, Map<String, dynamic> messageMap) async {

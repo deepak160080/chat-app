@@ -40,6 +40,8 @@ class _ConversationState extends State<Conversation> {
   List<types.Message> _messages = [];
   late types.User _user;
 
+  int unreadMessages = 0;
+
   @override
   void initState() {
     super.initState();
@@ -49,8 +51,8 @@ class _ConversationState extends State<Conversation> {
 
   void _loadMessages() {
     FirebaseFirestore.instance
-        .collection("conversations")
-        .doc("${Constants.localUsername}_chat")
+        .collection("chatrooms")
+        .doc(widget.roomId)
         .collection("chats")
         .orderBy("time", descending: true)
         .snapshots()
@@ -288,6 +290,11 @@ class _ConversationState extends State<Conversation> {
     // Sanitize the message text
     final sanitizedMessageText = _sanitizeMessage(messageText);
 
+    setState(() {
+      unreadMessages++;
+      print(unreadMessages);
+    });
+
     final messageMap = {
       "message": sanitizedMessageText,
       "sender": Constants.localUsername,
@@ -314,21 +321,11 @@ class _ConversationState extends State<Conversation> {
       });
     }
 
-    // Save in sender's conversation
-    await FirebaseFirestore.instance
-        .collection("conversations")
-        .doc("${Constants.localUsername}_chat")
-        .collection("chats")
-        .add(messageMap);
+    await _databaseMethods.conversation(widget.roomId, messageMap).then((a) {
+      print("done: $a");
+    });
 
-    // Save in receiver's conversation
-    await FirebaseFirestore.instance
-        .collection("conversations")
-        .doc("${widget.name}_chat")
-        .collection("chats")
-        .add(messageMap);
-
-    await _databaseMethods.updateUnreadMessages(widget.roomId, 1, widget.name);
+    await _databaseMethods.updateUnreadMessages(widget.roomId, unreadMessages, widget.name);
   }
 
   void _handleMessageTap(BuildContext _, types.Message message) async {
