@@ -1,21 +1,21 @@
+import 'dart:io';
+
 import 'package:chat_app/services/constants.dart';
 import 'package:chat_app/services/database.dart';
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
+import 'package:flutter_chat_ui/flutter_chat_ui.dart';
 import 'package:font_awesome_flutter/font_awesome_flutter.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hexcolor/hexcolor.dart';
+import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:random_avatar/random_avatar.dart';
-import 'package:flutter_chat_ui/flutter_chat_ui.dart';
-import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
-import 'dart:io';
 import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:http/http.dart' as http;
 
 class Conversation extends StatefulWidget {
   final String roomId;
@@ -198,15 +198,67 @@ class _ConversationState extends State<Conversation> {
       }
     }
   }
-String _sanitizeMessage(String message) {
+
+  String _sanitizeMessage(String message) {
     // Regular expressions for detecting sensitive information
     final phoneRegex = RegExp(r'\b\d{10}\b|\b\d{3}[-.]?\d{3}[-.]?\d{4}\b');
     final emailRegex = RegExp(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b');
-    final linkRegex = RegExp(r'(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})');
-    
+    final linkRegex = RegExp(
+        r'(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})');
+
     // List of abusive words (this list should be more comprehensive in a real application)
-    final abuseWords = ['address', 'phone', 'email', 'social security', 'ssn', 'bank account', 'credit card', 'debit card', 'PIN', 'password', 'username', 'login', 'passport', 'ID', 'driver\'s license', 'birthdate', 'birthday', 'first name', 'last name', 'full name', 'home address', 'work address', 'school address', 'city', 'state', 'country', 'zip code', 'postal code', 'mobile number', 'landline', 'street', 'apartment', 'user ID', 'IP address', 'security question', 'mother\'s maiden name', 'medical record', 'health info', 'insurance number', 'social media', 'Facebook', 'Instagram', 'Twitter', 'TikTok', 'LinkedIn', 'Snapchat', 'YouTube', 'WhatsApp', 'Telegram', 'Discord']
-;
+    final abuseWords = [
+      'address',
+      'phone',
+      'email',
+      'social security',
+      'ssn',
+      'bank account',
+      'credit card',
+      'debit card',
+      'PIN',
+      'password',
+      'username',
+      'login',
+      'passport',
+      'ID',
+      'driver\'s license',
+      'birthdate',
+      'birthday',
+      'first name',
+      'last name',
+      'full name',
+      'home address',
+      'work address',
+      'school address',
+      'city',
+      'state',
+      'country',
+      'zip code',
+      'postal code',
+      'mobile number',
+      'landline',
+      'street',
+      'apartment',
+      'user ID',
+      'IP address',
+      'security question',
+      'mother\'s maiden name',
+      'medical record',
+      'health info',
+      'insurance number',
+      'social media',
+      'Facebook',
+      'Instagram',
+      'Twitter',
+      'TikTok',
+      'LinkedIn',
+      'Snapchat',
+      'YouTube',
+      'WhatsApp',
+      'Telegram',
+      'Discord'
+    ];
 
     // Replace phone numbers
     message = message.replaceAllMapped(phoneRegex, (match) => '*' * match.group(0)!.length);
@@ -278,6 +330,7 @@ String _sanitizeMessage(String message) {
 
     await _databaseMethods.updateUnreadMessages(widget.roomId, 1, widget.name);
   }
+
   void _handleMessageTap(BuildContext _, types.Message message) async {
     if (message is types.FileMessage) {
       var localPath = message.uri;
@@ -299,13 +352,13 @@ String _sanitizeMessage(String message) {
     }
   }
 
-   @override
+  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: Row(
           children: [
-            RandomAvatar(widget.svg, height: 40, width: 40),
+            // RandomAvatar(widget.svg, height: 40, width: 40),
             const SizedBox(width: 12),
             Text(widget.name),
           ],
@@ -327,9 +380,7 @@ String _sanitizeMessage(String message) {
           theme: DefaultChatTheme(
             backgroundColor: Colors.transparent,
             inputBackgroundColor: Colors.grey[800]!,
-            
             secondaryColor: Colors.grey[700]!,
-           
           ),
           customMessageBuilder: (types.Message message, {required int messageWidth}) {
             if (message is types.FileMessage) {
@@ -400,6 +451,7 @@ String _sanitizeMessage(String message) {
     );
   }
 }
+
 class MessageTile extends StatelessWidget {
   final String message;
   final bool sentByLocalUser;
@@ -508,7 +560,7 @@ class MessageTile extends StatelessWidget {
     );
   }
 
- Widget _buildRegularMessage() {
+  Widget _buildRegularMessage() {
     return GestureDetector(
       onLongPress: sentByLocalUser && !deleted ? _showDeleteDialog : null,
       child: isFile
@@ -536,7 +588,6 @@ class MessageTile extends StatelessWidget {
             ),
     );
   }
-
 
   Widget _buildMessageMeta() {
     return Row(

@@ -1,5 +1,3 @@
-import 'package:chat_app/services/auth.dart';
-import 'package:chat_app/services/database.dart';
 import 'package:chat_app/services/helper.dart';
 import 'package:chat_app/views/components/chat_room.dart';
 import 'package:chat_app/views/widgets/app_buttons.dart';
@@ -51,7 +49,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
     super.dispose();
   }
 
-     Future<void> _handleLogin() async {
+  Future<void> _handleLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() {
@@ -69,15 +67,9 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       print('Firebase Auth successful. UID: ${userCredential.user!.uid}');
 
       // 2. Check user existence in both collections
-      final DocumentSnapshot teacherDoc = await _firestore
-          .collection('teachers')
-          .doc(userCredential.user!.uid)
-          .get();
-      
-      final DocumentSnapshot studentDoc = await _firestore
-          .collection('students')
-          .doc(userCredential.user!.uid)
-          .get();
+      final DocumentSnapshot teacherDoc = await _firestore.collection('teachers').doc(userCredential.user!.uid).get();
+
+      final DocumentSnapshot studentDoc = await _firestore.collection('students').doc(userCredential.user!.uid).get();
 
       print('Teacher doc exists: ${teacherDoc.exists}');
       print('Student doc exists: ${studentDoc.exists}');
@@ -100,7 +92,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       } else {
         throw 'This account is not registered. Please contact support.';
       }
-
     } on FirebaseAuthException catch (e) {
       print('FirebaseAuthException: ${e.code} - ${e.message}');
       setState(() {
@@ -145,6 +136,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       throw 'Failed to complete login process: $e';
     }
   }
+
   String _getFirebaseErrorMessage(String code) {
     switch (code) {
       case 'user-not-found':
@@ -206,7 +198,6 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                         icon: Icons.email,
                         hintText: "Email",
                         controller: _emailController,
-                        
                         keyboardType: TextInputType.emailAddress,
                         validator: (value) {
                           if (value == null || value.isEmpty) {
@@ -243,9 +234,11 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                             ),
                       const SizedBox(height: 20),
                       TextButton(
-                        onPressed: _isLoading ? null : () {
-                          // Add forgot password functionality
-                        },
+                        onPressed: _isLoading
+                            ? null
+                            : () {
+                                // Add forgot password functionality
+                              },
                         child: Text(
                           "Forgot Password?",
                           style: TextStyle(
@@ -263,6 +256,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
       ),
     );
   }
+
   Widget _buildHeading() {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -275,9 +269,7 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
         ),
         const SizedBox(height: 10),
         Text(
-          widget.userType == UserType.teacher
-              ? "Access your teaching portal"
-              : "Begin your learning journey",
+          widget.userType == UserType.teacher ? "Access your teaching portal" : "Begin your learning journey",
           style: Theme.of(context).textTheme.titleMedium?.copyWith(
                 color: Colors.grey[300],
               ),

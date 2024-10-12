@@ -1,16 +1,20 @@
 import 'dart:async';
-import 'package:chat_app/views/auth/login_page.dart';
+
 import 'package:chat_app/views/components/conversation.dart';
 import 'package:chat_app/views/widgets/app_textfield.dart';
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+
+import '../../services/constants.dart';
+import '../../services/database.dart';
+import '../../services/helper.dart';
 
 class Search extends StatefulWidget {
   const Search({super.key});
 
   @override
- State<Search> createState() => _SearchState();
+  State<Search> createState() => _SearchState();
 }
 
 class _SearchState extends State<Search> {
@@ -19,6 +23,8 @@ class _SearchState extends State<Search> {
   List<TeacherModel> _searchResults = [];
   bool _isLoading = false;
   Timer? _debounce;
+
+  final DatabaseMethods _database = DatabaseMethods();
 
   @override
   void initState() {
@@ -67,9 +73,7 @@ class _SearchState extends State<Search> {
           .get();
 
       setState(() {
-        _searchResults = results.docs
-            .map((doc) => TeacherModel.fromFirestore(doc))
-            .toList();
+        _searchResults = results.docs.map((doc) => TeacherModel.fromFirestore(doc)).toList();
         _isLoading = false;
       });
     } catch (e) {
@@ -169,6 +173,37 @@ class _SearchState extends State<Search> {
     );
   }
 
+  String getChatRoomId(String a, String b) {
+    if (a.substring(0, 1).codeUnitAt(0) > b.substring(0, 1).codeUnitAt(0)) {
+      return "${b}_$a";
+    } else {
+      return "${a}_$b";
+    }
+  }
+
+  createChatRoom(String searchUserName, String svg) async {
+    final username = await Helper().getName() ?? "";
+    String roomId = getChatRoomId(searchUserName, username);
+    List<String> users = [searchUserName, username];
+
+    Map<String, dynamic> chatRoomMap = {
+      "chatRoomId": roomId,
+      "users": users,
+      // "userSvg": usersSvg,
+      "unreadMessages": {searchUserName: 0, Constants.localUsername: 0}
+    };
+    await _database.createChatRoom(roomId, chatRoomMap).then((a) {
+      Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (context) => Conversation(
+                    roomId: roomId,
+                    svg: svg,
+                    name: searchUserName,
+                  )));
+    });
+  }
+
   Widget _buildTeacherListTile(TeacherModel teacher) {
     return ListTile(
       leading: CircleAvatar(
@@ -177,8 +212,7 @@ class _SearchState extends State<Search> {
       title: Text('${teacher.username}_T', style: GoogleFonts.roboto(fontWeight: FontWeight.bold)),
       subtitle: Text(teacher.name, style: GoogleFonts.roboto()),
       onTap: () {
-        Navigator.push(context, MaterialPageRoute(builder: (_) => Conversation(roomId: teacher.id, svg: teacher.username, name: teacher.name, )));
-        print('Selected teacher: ${teacher.name}');
+        createChatRoom(teacher.username, "");
       },
     );
   }
