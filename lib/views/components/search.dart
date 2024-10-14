@@ -67,8 +67,8 @@ class _SearchState extends State<Search> {
     try {
       final QuerySnapshot results = await _firestore
           .collection('teachers')
-          .where('name', isGreaterThanOrEqualTo: _searchController.text.trim())
-          .where('name', isLessThan: '${_searchController.text.trim()}z')
+          .where('name', isGreaterThanOrEqualTo: _searchController.text.trim().toUpperCase())
+          .where('name', isLessThan: '${_searchController.text.trim().toLowerCase()}z')
           .limit(20)
           .get();
 

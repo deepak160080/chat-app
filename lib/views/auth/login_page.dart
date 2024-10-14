@@ -80,10 +80,10 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
 
       // 4. Handle login based on user's role and current login page
       if (isTeacher && widget.userType == UserType.teacher) {
-        print('Logging in as teacher');
+        print('Logging in as teacher ${teacherDoc.data()}');
         await _processSuccessfulLogin(teacherDoc.data() as Map<String, dynamic>, UserType.teacher);
       } else if (isStudent && widget.userType == UserType.student) {
-        print('Logging in as student');
+        print('Logging in as student ${studentDoc.data()}');
         await _processSuccessfulLogin(studentDoc.data() as Map<String, dynamic>, UserType.student);
       } else if (isTeacher && widget.userType == UserType.student) {
         throw 'This account is registered as a teacher. Please use the teacher login.';

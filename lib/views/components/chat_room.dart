@@ -62,13 +62,13 @@ class _ChatRoomState extends State<ChatRoom> {
     final email = await _helper.getEmail();
     final svg = await _helper.getSvg();
 
-    if (name == null || email == null || svg == null) {
+    if (name == null || email == null) {
       throw Exception('Failed to load user profile data');
     }
 
     Constants.localUsername = name;
     Constants.localEmail = email;
-    Constants.localSvg = svg;
+    Constants.localSvg = svg ?? "";
   }
 
   Future<void> _loadChatStreams() async {
