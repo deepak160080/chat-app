@@ -2,6 +2,60 @@ import 'package:chat_app/services/conversation_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DatabaseMethods {
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  Future<void> markAllMessagesAsRead(String roomId, String userId) async {
+    try {
+      WriteBatch batch = _firestore.batch();
+
+      QuerySnapshot unreadMessages = await _firestore
+          .collection("chatrooms")
+          .doc(roomId)
+          .collection("chats")
+          .where("read", isEqualTo: false)
+          .where("receiverId", isEqualTo: userId)
+          .get();
+
+      for (QueryDocumentSnapshot doc in unreadMessages.docs) {
+        batch.update(doc.reference, {"read": true});
+      }
+
+      await batch.commit();
+    } catch (e) {
+      print("Error marking all messages as read: $e");
+      // Consider implementing proper error handling or logging
+    }
+  }
+
+  Future<void> updateLastReadTimestamp(String roomId, String userId) async {
+    try {
+      await _firestore.collection("chatrooms").doc(roomId).update({
+        "lastRead.$userId": FieldValue.serverTimestamp(),
+      });
+    } catch (e) {
+      print("Error updating last read timestamp: $e");
+      // Consider implementing proper error handling or logging
+    }
+  }
+
+  Future<void> markMessageAsRead(String roomId, String messageId) async {
+    try {
+      await _firestore.collection("chatrooms").doc(roomId).collection("chats").doc(messageId).update({"read": true});
+    } catch (e) {
+      print("Error marking message as read: $e");
+      // Consider implementing proper error handling or logging
+    }
+  }
+
+  Future<String?> getFCMToken(String userId) async {
+    try {
+      DocumentSnapshot userDoc = await _firestore.collection("users").doc(userId).get();
+      return userDoc.get('fcmToken') as String?;
+    } catch (e) {
+      print("Error getting FCM token: $e");
+      return null;
+    }
+  }
+
   uploadUserInfo(Map<String, String> map) {
     FirebaseFirestore.instance.collection("users").add(map);
   }
@@ -189,12 +243,5 @@ class FirestoreService {
   Future<String> createConversation(Conversation conversation) async {
     DocumentReference docRef = await _firestore.collection('conversations').add(conversation.toMap());
     return docRef.id;
-  }
-
-  // Mark messages as read
-  Future<void> markAsRead(String conversationId, String userId) async {
-    await _firestore.collection('conversations').doc(conversationId).update({
-      'unreadCount.$userId': 0,
-    });
   }
 }

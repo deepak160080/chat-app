@@ -1,3 +1,4 @@
+import 'package:chat_app/services/notification_services.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:chat_app/services/helper.dart';
@@ -5,15 +6,11 @@ import 'package:chat_app/utils/app_theme.dart';
 import 'package:chat_app/views/auth/login_page.dart';
 import 'package:chat_app/views/components/chat_room.dart';
 import 'package:chat_app/views/welcome_screen.dart';
-import 'firebase_options.dart';
-
-
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(
-    options: DefaultFirebaseOptions.currentPlatform
-  );
+  await Firebase.initializeApp();
+  NotificationService.initialize();
   runApp(const MyApp());
 }
 
@@ -36,17 +33,17 @@ class _MyAppState extends State<MyApp> {
     super.initState();
   }
 
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Android chat app',
+      title: 'Chat App',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
-      home: isLoggedIn && userType != null
-          ? ChatRoom(userType: userType!)
-          : const WelcomeScreen(),
+
+      home: isLoggedIn && userType != null ? ChatRoom(userType: userType!) : const WelcomeScreen(),
     );
   }
 

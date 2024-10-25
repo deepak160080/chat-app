@@ -8,9 +8,47 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:1057229849830:android:cdfa777ec46e5e2a99a727",
+        "android_client_info": {
+          "package_name": "virtualhelp.chatapp.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCMd2CIMbagi0XzdQQQ3VgL-w2xhXAqrkw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:1057229849830:android:2e806072b2e3460099a727",
         "android_client_info": {
-          "package_name": "com.virtualhelp.chatapp"
+          "package_name": "virtualhelp.chatapp.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCMd2CIMbagi0XzdQQQ3VgL-w2xhXAqrkw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1057229849830:android:a17968ed410bd63299a727",
+        "android_client_info": {
+          "package_name": "virtualhelp.chatapp.app"
         }
       },
       "oauth_client": [],

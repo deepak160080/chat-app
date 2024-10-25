@@ -1,11 +1,15 @@
+import 'dart:io';
+
 import 'package:chat_app/services/validator.dart';
-import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:chat_app/utils/app_colors.dart';
 import 'package:chat_app/views/widgets/app_buttons.dart';
 import 'package:chat_app/views/widgets/app_textfield.dart';
-import 'package:chat_app/utils/app_colors.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:image_picker/image_picker.dart';
 
 class TeacherAuth extends StatefulWidget {
   const TeacherAuth({super.key});
@@ -20,18 +24,82 @@ class _TeacherAuthState extends State<TeacherAuth> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   final TextEditingController username = TextEditingController();
-  
+
   bool _isLoading = false;
   String? _selectedRole;
   String? _errorMessage;
+  File? _image;
 
   // Firebase instances
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseStorage _storage = FirebaseStorage.instance;
+
+  Widget _buildImagePicker() {
+    return GestureDetector(
+      onTap: _pickImage,
+      child: Container(
+        width: 100, // Adjust the size of the circle as needed
+        height: 100,
+        decoration: BoxDecoration(
+          shape: BoxShape.circle,
+          color: Colors.grey[200],
+          image: _image != null
+              ? DecorationImage(
+                  image: FileImage(_image!),
+                  fit: BoxFit.contain, // Ensures the image covers the circle properly
+                )
+              : null,
+        ),
+        child: _image == null
+            ? Icon(
+                Icons.camera_alt,
+                size: 50,
+                color: Colors.grey[800],
+              )
+            : null,
+      ),
+    );
+  }
+
+  Future<void> _pickImage() async {
+    final ImagePicker picker = ImagePicker();
+    final XFile? pickedFile = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 70,
+    );
+
+    if (pickedFile != null) {
+      setState(() {
+        _image = File(pickedFile.path);
+      });
+    }
+  }
+
+  Future<String?> _uploadImage(String userId) async {
+    if (_image == null) return null;
+
+    try {
+      // Create a reference to the file location
+      final ref = _storage.ref().child('profile_images').child('$userId.jpg');
+
+      // Upload the file with specific metadata to maintain quality
+      final metadata = SettableMetadata(
+        contentType: 'image/jpeg',
+        customMetadata: {'picked-file-path': _image!.path},
+      );
+
+      await ref.putFile(_image!, metadata);
+      return await ref.getDownloadURL();
+    } catch (e) {
+      print('Error uploading image: $e');
+      return null;
+    }
+  }
 
   Future<void> _createAccount() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
-    
+
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -45,6 +113,9 @@ class _TeacherAuthState extends State<TeacherAuth> {
       );
 
       if (userCredential.user != null) {
+        // Upload image and get URL
+        final String? imageUrl = await _uploadImage(userCredential.user!.uid);
+
         // Prepare user data
         final userData = {
           'name': _nameController.text.trim(),
@@ -53,19 +124,14 @@ class _TeacherAuthState extends State<TeacherAuth> {
           'role': _selectedRole,
           'createdAt': FieldValue.serverTimestamp(),
           'userId': userCredential.user!.uid,
-          'password': _passwordController.text, // Adding password to Firestore
+          'svg': imageUrl,
         };
 
         // Determine collection based on role
-        final String collection = _selectedRole?.toLowerCase() == 'student' 
-            ? 'students' 
-            : 'teachers';
+        final String collection = _selectedRole?.toLowerCase() == 'student' ? 'students' : 'teachers';
 
         // Save user data to Firestore
-        await _firestore
-            .collection(collection)
-            .doc(userCredential.user!.uid)
-            .set(userData);
+        await _firestore.collection(collection).doc(userCredential.user!.uid).set(userData);
 
         // Update display name
         await userCredential.user!.updateDisplayName(_nameController.text.trim());
@@ -111,7 +177,6 @@ class _TeacherAuthState extends State<TeacherAuth> {
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -144,6 +209,8 @@ class _TeacherAuthState extends State<TeacherAuth> {
                   textAlign: TextAlign.center,
                 ),
                 const SizedBox(height: 30),
+                _buildImagePicker(),
+                const SizedBox(height: 16),
                 if (_errorMessage != null)
                   Padding(
                     padding: const EdgeInsets.only(bottom: 16.0),
@@ -183,7 +250,6 @@ class _TeacherAuthState extends State<TeacherAuth> {
       icon: Icons.person,
       hintText: "Full Name",
       validator: Validators.validateName,
-      
     );
   }
 
@@ -194,7 +260,6 @@ class _TeacherAuthState extends State<TeacherAuth> {
       hintText: "Email",
       keyboardType: TextInputType.emailAddress,
       validator: Validators.validateEmailOrPhone,
-      
     );
   }
 
@@ -219,7 +284,6 @@ class _TeacherAuthState extends State<TeacherAuth> {
       icon: Icons.person,
       hintText: "Username",
       validator: Validators.validateSchool,
-      
     );
   }
 
@@ -231,23 +295,24 @@ class _TeacherAuthState extends State<TeacherAuth> {
         labelText: "Select Role",
         border: OutlineInputBorder(),
       ),
-      items: ['Student', 'Teacher']
-          .map<DropdownMenuItem<String>>((String value) {
+      items: ['Student', 'Teacher'].map<DropdownMenuItem<String>>((String value) {
         return DropdownMenuItem<String>(
           value: value,
           child: Text(value),
         );
       }).toList(),
-      onChanged: _isLoading ? null : (String? newValue) {
-        setState(() {
-          _selectedRole = newValue;
-        });
-      },
+      onChanged: _isLoading
+          ? null
+          : (String? newValue) {
+              setState(() {
+                _selectedRole = newValue;
+              });
+            },
       validator: (value) => value == null ? 'Please select a role' : null,
     );
   }
 
- @override
+  @override
   void dispose() {
     _nameController.dispose();
     _emailController.dispose();

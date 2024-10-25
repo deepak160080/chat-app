@@ -34,5 +34,9 @@ username can be small not capitalized
 time milne prr = message restriction konse user ne use kiya tha wo firebase ke andrr add ho jayegaa
 
 
+add: notification that user have new message 
+
+add: fix list when new message 
+add: image when create new account
 
 

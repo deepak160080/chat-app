@@ -20,6 +20,7 @@ class Search extends StatefulWidget {
 class _SearchState extends State<Search> {
   final TextEditingController _searchController = TextEditingController();
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final String receiverId = "";
   List<TeacherModel> _searchResults = [];
   bool _isLoading = false;
   Timer? _debounce;
@@ -200,6 +201,7 @@ class _SearchState extends State<Search> {
                     roomId: roomId,
                     svg: svg,
                     name: searchUserName,
+                    receiverId: receiverId,
                   )));
     });
   }
