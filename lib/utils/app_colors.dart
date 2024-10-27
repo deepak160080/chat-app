@@ -8,7 +8,7 @@ class AppColors {
 
   // Background colors
   static const Color backgroundColor = Color(0xFF121212);
-  static const Color surfaceColor = Color(0xFF262630);
+  static const Color surfaceColor = Color(0xFF131419);
 
   // Text colors
   static const Color primaryTextColor = Colors.white;

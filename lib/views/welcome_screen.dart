@@ -28,9 +28,9 @@ class WelcomeScreen extends StatelessWidget {
           SizedBox(height: MediaQuery.of(context).size.height * 0.1),
           _buildLottieAnimation(),
           const SizedBox(height: 20),
-          _buildWelcomeText(),
+          _buildWelcomeText(context),
           const SizedBox(height: 20),
-          _buildSubtitle(),
+          _buildSubtitle(context),
           const SizedBox(height: 60),
           _buildLoginButton(context, UserType.teacher),
           const SizedBox(height: 20),
@@ -47,7 +47,7 @@ class WelcomeScreen extends StatelessWidget {
       onPressed: () {
         Navigator.push(context, MaterialPageRoute(builder: (_) => const TeacherAuth()));
       },
-      child: const Text('Create Teacher Account'),
+      child: const Text('Create New Account'),
     );
   }
 
@@ -78,9 +78,9 @@ class WelcomeScreen extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.start, // Align content to the left
               children: [
-                _buildWelcomeText(),
+                _buildWelcomeText(context),
                 const SizedBox(height: 20),
-                _buildSubtitle(),
+                _buildSubtitle(context),
                 const SizedBox(height: 60),
                 _buildLoginButton(context, UserType.teacher),
                 const SizedBox(height: 20),
@@ -104,24 +104,26 @@ class WelcomeScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildWelcomeText() {
-    return const Text(
+  Widget _buildWelcomeText(BuildContext context) {
+    return Text(
       'Welcome to Chat App',
       style: TextStyle(
         fontSize: 36,
         fontWeight: FontWeight.bold,
-        color: Colors.white,
+        color: Theme.of(context).textTheme.bodyLarge?.color,
       ),
+      textAlign: TextAlign.center,
     );
   }
 
-  Widget _buildSubtitle() {
-    return const Text(
+  Widget _buildSubtitle(BuildContext context) {
+    return Text(
       'Empowering education through seamless connectivity',
       style: TextStyle(
         fontSize: 18, // Increased font size for desktop
-        color: Colors.white70,
+        color: Theme.of(context).textTheme.bodyMedium?.color,
       ),
+      textAlign: TextAlign.center,
     );
   }
 

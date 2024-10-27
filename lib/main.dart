@@ -1,17 +1,18 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:virtualhelp_chat/firebase_options.dart';
+import 'package:virtualhelp_chat/provider/theme_provider.dart';
 import 'package:virtualhelp_chat/services/helper.dart';
-import 'package:virtualhelp_chat/services/notification_services.dart';
-import 'package:virtualhelp_chat/utils/app_theme.dart';
 import 'package:virtualhelp_chat/views/auth/login_page.dart';
 import 'package:virtualhelp_chat/views/components/chat_room.dart';
 import 'package:virtualhelp_chat/views/welcome_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  NotificationService.initialize();
-  runApp(const MyApp());
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  // NotificationService.initialize();
+  runApp(ChangeNotifierProvider(create: (_) => ThemeProvider(), child: const MyApp()));
 }
 
 class MyApp extends StatefulWidget {
@@ -35,14 +36,14 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      debugShowCheckedModeBanner: false,
-      title: 'Virtual Help ChatApp',
-      theme: AppTheme.lightTheme,
-      darkTheme: AppTheme.darkTheme,
-      themeMode: ThemeMode.system,
-      home: isLoggedIn && userType != null ? ChatRoom(userType: userType!) : const WelcomeScreen(),
-    );
+    return Consumer<ThemeProvider>(builder: (context, themeProvider, child) {
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        title: 'Virtual Help ChatApp',
+        theme: themeProvider.themeData,
+        home: isLoggedIn && userType != null ? ChatRoom(userType: userType!) : const WelcomeScreen(),
+      );
+    });
   }
 
   getLogStatus() async {

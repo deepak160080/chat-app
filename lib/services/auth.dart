@@ -2,68 +2,56 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
-class AuthMethods{
-
+class AuthMethods {
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  Future<User?> signUpWithEmailAndPassword(String email, String password) async{
-    try{
+  Future<User?> signUpWithEmailAndPassword(String email, String password) async {
+    try {
       UserCredential credential = await _auth.createUserWithEmailAndPassword(email: email, password: password);
       return credential.user;
-    }
-    on FirebaseAuthException catch(e){
+    } on FirebaseAuthException catch (e) {
       print(e.message);
     }
     return null;
   }
 
-  Future<User?> signInWithEmailAndPassword(String email, String password) async{
-    try{
+  Future<User?> signInWithEmailAndPassword(String email, String password) async {
+    try {
       UserCredential credential = await _auth.signInWithEmailAndPassword(email: email, password: password);
       return credential.user;
-    }
-    on FirebaseAuthException catch(e){
+    } on FirebaseAuthException catch (e) {
       print(e.message);
     }
     return null;
   }
 
-  Future resetPassword(String email) async{
-    try{
+  Future resetPassword(String email) async {
+    try {
       return await _auth.sendPasswordResetEmail(email: email);
-    }
-    on FirebaseAuthException catch(e){
+    } on FirebaseAuthException catch (e) {
       print(e.message);
     }
     return null;
   }
 
-
-  Future signOut() async{
-    try{
+  Future signOut() async {
+    try {
       return await _auth.signOut();
-    }
-    on FirebaseAuthException catch(e){
+    } on FirebaseAuthException catch (e) {
       print(e.message);
     }
     return null;
   }
 
-  Future sendResetPasswordEmail(String email) async{
-    try{
+  Future sendResetPasswordEmail(String email) async {
+    try {
       return await _auth.sendPasswordResetEmail(email: email);
-    }
-    on FirebaseAuthException catch(e){
+    } on FirebaseAuthException catch (e) {
       print(e.message);
     }
     return null;
   }
 }
-
-
-
-
-
 
 class AuthFunctions {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -78,7 +66,7 @@ class AuthFunctions {
 
   Future<void> sendOtp(String phoneNumber, Function(String) onCodeSent, Function(String) onError) async {
     await _auth.verifyPhoneNumber(
-      phoneNumber: '+1$phoneNumber',  // Adjust country code as needed
+      phoneNumber: '+1$phoneNumber', // Adjust country code as needed
       verificationCompleted: (PhoneAuthCredential credential) async {
         await _auth.signInWithCredential(credential);
       },
@@ -108,16 +96,13 @@ class AuthFunctions {
   }
 
   void showSuccessSnackBar(BuildContext context, String message) {
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(message),
-      backgroundColor: Colors.green,
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.green));
   }
 
   void showErrorSnackBar(BuildContext context, String message) {
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
       content: Text(message),
-      backgroundColor: Colors.red,
+      backgroundColor: Theme.of(context).colorScheme.error,
     ));
   }
 }

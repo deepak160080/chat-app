@@ -2,16 +2,14 @@ import 'dart:io';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:photo_view/photo_view.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'package:virtualhelp_chat/services/constants.dart';
 import 'package:virtualhelp_chat/services/database.dart';
 import 'package:virtualhelp_chat/services/notification_services.dart';
@@ -100,28 +98,28 @@ class _ConversationState extends State<Conversation> {
   void initState() {
     super.initState();
     _loadMessages();
-    _initializeNotifications();
+    // _initializeNotifications();
   }
 
-  void _initializeNotifications() async {
-    // Request notification permissions
-    await FirebaseMessaging.instance.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+  // void _initializeNotifications() async {
+  //   // Request notification permissions
+  //   await FirebaseMessaging.instance.requestPermission(
+  //     alert: true,
+  //     badge: true,
+  //     sound: true,
+  //   );
 
-    // Save the user's FCM token
-    await NotificationService.saveUserFCMToken(Constants.localId);
+  //   // Save the user's FCM token
+  //   await NotificationService.saveUserFCMToken(Constants.localId);
 
-    // Handle incoming messages when app is in foreground
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      _notificationService.showLocalNotification(
-        title: message.notification?.title ?? '',
-        body: message.notification?.body ?? '',
-      );
-    });
-  }
+  //   // Handle incoming messages when app is in foreground
+  //   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+  //     _notificationService.showLocalNotification(
+  //       title: message.notification?.title ?? '',
+  //       body: message.notification?.body ?? '',
+  //     );
+  //   });
+  // }
 
   void _loadMessages() {
     FirebaseFirestore.instance
@@ -200,60 +198,178 @@ class _ConversationState extends State<Conversation> {
 
   Future<void> _sendMessage(String messageText,
       {String? fileUrl, String? fileName, bool isImage = false, bool isFile = false}) async {
-    // Message sending logic
-    final messageMap = {
-      "message": messageText,
-      "sender": Constants.localUsername,
-      "senderId": Constants.localId,
-      "receiver": widget.name,
-      "receiverId": widget.receiverId,
-      "time": DateTime.now().millisecondsSinceEpoch,
-      "date": "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}",
-      "deleted": false,
-      "seen": false,
-    };
-
-    if (fileUrl != null) {
-      messageMap.addAll({
-        "isFile": !isImage,
-        "isImage": isImage,
-        "fileUrl": fileUrl,
-      });
-    }
-
-    await _databaseMethods.conversation(widget.roomId, messageMap);
-
     try {
-      final recipientDoc = await FirebaseFirestore.instance.collection('users').doc(widget.receiverId).get();
-      final recipientToken = recipientDoc.data()?['fcmToken'];
-
-      if (recipientToken != null) {
-        await _notificationService.sendNotification(
-          recipientToken: recipientToken,
-          senderName: Constants.localUsername,
-          message: isImage
-              ? '📷 Image'
-              : isFile
-                  ? '📎 File'
-                  : messageText,
-        );
+      // Show loading indicator while sending
+      if (isImage || isFile) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sending...')));
       }
-    } catch (e) {
-      print('Error sending notification: $e');
-    }
 
-    _messageController.clear();
-    _scrollToBottom();
+      // Create the base message map
+      final messageMap = {
+        "message": messageText,
+        "sender": Constants.localUsername,
+        "senderId": Constants.localId,
+        "receiver": widget.name,
+        "receiverId": widget.receiverId,
+        "time": DateTime.now().millisecondsSinceEpoch,
+        "date": "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}",
+        "deleted": false,
+        "seen": false,
+      };
+
+      // Add file-related fields if a file is being sent
+      if (fileUrl != null) {
+        messageMap.addAll({
+          "isFile": !isImage,
+          "isImage": isImage,
+          "fileUrl": fileUrl,
+          "fileName": fileName!,
+        });
+      }
+
+      await _databaseMethods.conversation(widget.roomId, messageMap);
+
+      // Hide loading indicator
+      if (isImage || isFile) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      }
+
+      _messageController.clear();
+      _scrollToBottom();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error sending message: $e')));
+    }
+  }
+
+  Future<File> _compressImage(File file) async {
+    final img.Image? image = img.decodeImage(await file.readAsBytes());
+    if (image == null) return file;
+
+    final img.Image compressedImage = img.copyResize(
+      image,
+      width: 800, // Max width
+      height: (800 * image.height / image.width).round(), // Maintain aspect ratio
+    );
+
+    final String dir = (await getTemporaryDirectory()).path;
+    final String path = '$dir/${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final File result = File(path)..writeAsBytesSync(img.encodeJpg(compressedImage, quality: 85));
+
+    return result;
+  }
+
+  Future<String?> _generateThumbnail(String imageUrl) async {
+    try {
+      final File file = await _downloadFile(imageUrl);
+      final File thumbnail = await _compressImage(file);
+      return await _uploadFile(thumbnail, 'thumb_${DateTime.now().millisecondsSinceEpoch}.jpg');
+    } catch (e) {
+      print('Error generating thumbnail: $e');
+      return null;
+    }
+  }
+
+  Future<File> _downloadFile(String url) async {
+    try {
+      // Get temporary directory
+      final Directory tempDir = await getTemporaryDirectory();
+      final String tempPath = tempDir.path;
+
+      // Create a unique filename
+      final String fileName = '${DateTime.now().millisecondsSinceEpoch}.tmp';
+      final String filePath = '$tempPath/$fileName';
+
+      // Download the file
+      final http.Response response = await http.get(Uri.parse(url));
+
+      // Save to temporary file
+      final File file = File(filePath);
+      await file.writeAsBytes(response.bodyBytes);
+
+      return file;
+    } catch (e) {
+      print('Error downloading file: $e');
+      rethrow;
+    }
+  }
+
+  final List<String> _allowedDocumentExtensions = [
+    'pdf',
+    'doc',
+    'docx',
+    'txt',
+    'rtf',
+    'odt',
+    'xls',
+    'xlsx',
+    'csv',
+    'ppt',
+    'pptx',
+    'pages',
+    'numbers',
+    'key',
+    'md'
+  ];
+
+// Add this validation function
+  bool _isValidDocumentType(String fileName) {
+    final extension = fileName.split('.').last.toLowerCase();
+    return _allowedDocumentExtensions.contains(extension);
   }
 
   void _handleAttachmentPressed() async {
-    final result = await FilePicker.platform.pickFiles();
-    if (result != null && result.files.single.path != null) {
-      final file = File(result.files.single.path!);
-      final fileName = result.files.single.name;
-      final fileUrl = await _uploadFile(file, fileName);
-      if (fileUrl != null) {
-        _sendMessage('', fileUrl: fileUrl, fileName: fileName);
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: _allowedDocumentExtensions,
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        final fileName = result.files.single.name;
+
+        if (!_isValidDocumentType(fileName)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Please select only document files. Audio, video, and other file types are not allowed.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+
+        // Show loading indicator
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Uploading document...')),
+          );
+        }
+
+        final fileUrl = await _uploadFile(file, fileName);
+        if (fileUrl != null) {
+          _sendMessage('', fileUrl: fileUrl, fileName: fileName, isFile: true);
+
+          // Show success message
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Document uploaded successfully'),
+                backgroundColor: Colors.green,
+              ),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading document: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
+          ),
+        );
       }
     }
   }
@@ -272,10 +388,12 @@ class _ConversationState extends State<Conversation> {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.name, style: GoogleFonts.archivo()),
-        backgroundColor: Colors.blueGrey[800],
+
+        // backgroundColor: Colors.blueGrey[800],
       ),
       body: Padding(
         padding: const EdgeInsets.all(10),
@@ -347,9 +465,8 @@ class _ConversationState extends State<Conversation> {
                 hintText: "Type a message",
                 border: InputBorder.none,
                 filled: true,
-                fillColor: Colors.transparent,
+                // fillColor: Colors.transparent,
               ),
-              style: const TextStyle(color: Colors.white),
               onChanged: (value) {
                 final filteredText = _filterContent(value);
                 if (filteredText != value) {
@@ -367,7 +484,10 @@ class _ConversationState extends State<Conversation> {
             icon: const Icon(Icons.send),
             onPressed: () {
               final filteredMessage = _filterContent(_messageController.text);
-              _sendMessage(filteredMessage);
+              // Only send message if it's not empty after trimming whitespace
+              if (filteredMessage.trim().isNotEmpty) {
+                _sendMessage(filteredMessage);
+              }
             },
           ),
         ],
@@ -386,13 +506,13 @@ class _ConversationState extends State<Conversation> {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
           decoration: BoxDecoration(
-            color: Colors.black54,
+            // color: Colors.black54,
             borderRadius: BorderRadius.circular(12),
           ),
           child: Text(
             _getDateText(date),
             style: GoogleFonts.archivo(
-              color: Colors.white,
+              // color: Colors.white,
               fontSize: 12,
               fontWeight: FontWeight.w500,
             ),
@@ -446,90 +566,119 @@ class MessageBubble extends StatefulWidget {
 }
 
 class _MessageBubbleState extends State<MessageBubble> {
-  bool _isSeen = false;
+  bool _isDownloading = false;
 
-  @override
-  void initState() {
-    super.initState();
-    _isSeen = widget.seen;
-  }
+  Widget _getDocumentIcon() {
+    if (widget.fileName == null) return const Icon(Icons.insert_drive_file, color: Colors.white);
 
-  void _handleTap(BuildContext context) {
-    if (widget.isImage && widget.fileUrl != null) {
-      _showImagePreview(context);
-    } else if (widget.isFile && widget.fileUrl != null) {
-      _downloadFile(context);
+    final extension = widget.fileName!.split('.').last.toLowerCase();
+
+    switch (extension) {
+      case 'pdf':
+        return const Icon(Icons.picture_as_pdf, color: Colors.white);
+      case 'doc':
+      case 'docx':
+      case 'txt':
+      case 'rtf':
+      case 'odt':
+        return const Icon(Icons.description, color: Colors.white);
+      case 'xls':
+      case 'xlsx':
+      case 'csv':
+        return const Icon(Icons.table_chart, color: Colors.white);
+      case 'ppt':
+      case 'pptx':
+        return const Icon(Icons.slideshow, color: Colors.white);
+      default:
+        return const Icon(Icons.insert_drive_file, color: Colors.white);
     }
   }
 
-  void _showImagePreview(BuildContext context) {
-    Navigator.of(context).push(MaterialPageRoute(
-      builder: (context) => Scaffold(
-        body: Container(
-          child: PhotoView(
-            imageProvider: NetworkImage(widget.fileUrl!),
-            minScale: PhotoViewComputedScale.contained,
-            maxScale: PhotoViewComputedScale.covered * 2,
-            backgroundDecoration: const BoxDecoration(
-              color: Colors.black,
-            ),
-          ),
-        ),
-      ),
-    ));
-  }
+  Future<void> _downloadAndOpenFile() async {
+    if (_isDownloading) return;
 
-  Future<void> _openFile(String filePath) async {
-    final Uri uri = Uri.parse('file://$filePath');
-    if (await canLaunchUrl(uri)) {
-      await launchUrl(uri);
-    } else {
-      throw 'Could not open the file: $filePath';
-    }
-  }
-
-  Future<void> _downloadFile(BuildContext context) async {
     try {
-      // Show a loading indicator
+      setState(() {
+        _isDownloading = true;
+      });
+
+      // Show downloading indicator
       ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Downloading file...')));
 
-      // Get the temporary directory of the device
-      Directory tempDir = await getTemporaryDirectory();
-      String tempPath = tempDir.path;
+      // Get app's documents directory for permanent storage
+      final Directory appDocDir = await getApplicationDocumentsDirectory();
+      final String fileName = widget.fileName ?? 'downloaded_file';
+      final String filePath = '${appDocDir.path}/$fileName';
 
-      // Generate a unique file name
-      String filePath = '$tempPath/${DateTime.now().millisecondsSinceEpoch}_${widget.fileName}';
-
-      // Download the file
-      http.Response response = await http.get(Uri.parse(widget.fileUrl!));
-      File file = File(filePath);
+      // Download file
+      final response = await http.get(Uri.parse(widget.fileUrl!));
+      final file = File(filePath);
       await file.writeAsBytes(response.bodyBytes);
 
-      // Hide the loading indicator
-      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      setState(() {
+        _isDownloading = false;
+      });
 
-      // Show success message with option to open the file
+      // Show success message with file location
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: const Text('File downloaded successfully'),
-          action: SnackBarAction(
-            label: 'Open',
-            onPressed: () async {
-              try {
-                await _openFile(filePath);
-              } catch (e) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('Error opening file: $e')),
-                );
-              }
-            },
-          ),
+          content: Text('File downloaded to: $filePath'),
+          duration: const Duration(seconds: 3),
         ),
       );
     } catch (e) {
-      print('Error downloading file: $e');
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Error downloading file')));
+      setState(() {
+        _isDownloading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error downloading file: $e')));
     }
+  }
+
+  Widget _buildFileContent() {
+    if (widget.isFile && widget.fileUrl != null) {
+      return GestureDetector(
+        onTap: _downloadAndOpenFile,
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _isDownloading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        // color: Colors.white,
+                      ),
+                    )
+                  : _getDocumentIcon(),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.fileName ?? 'Document',
+                      style: GoogleFonts.archivo(),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      'Tap to download',
+                      style: GoogleFonts.archivo(
+                        // color: Colors.white70,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return Text(widget.message, style: GoogleFonts.archivo(color: Colors.white));
   }
 
   @override
@@ -538,61 +687,38 @@ class _MessageBubbleState extends State<MessageBubble> {
       padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
       child: Align(
         alignment: widget.isMe ? Alignment.centerRight : Alignment.centerLeft,
-        child: GestureDetector(
-          onTap: () => _handleTap(context),
-          child: Container(
-            decoration: BoxDecoration(
-              color: widget.isMe ? const Color(0xff5953ff) : const Color(0xff12744f),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (widget.isImage && widget.fileUrl != null)
-                  Image.network(
-                    widget.fileUrl!,
-                    width: 200,
-                    fit: BoxFit.cover,
-                    loadingBuilder: (context, child, loadingProgress) {
-                      if (loadingProgress == null) return child;
-                      return const CircularProgressIndicator();
-                    },
-                  )
-                else if (widget.isFile && widget.fileUrl != null)
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.attachment, color: Colors.white),
-                      const SizedBox(width: 8),
-                      Text(widget.fileName ?? 'File', style: GoogleFonts.archivo(color: Colors.white)),
-                    ],
-                  )
-                else
-                  Text(widget.message, style: GoogleFonts.archivo(color: Colors.white)),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+        child: Container(
+          decoration: BoxDecoration(
+            color: widget.isMe ? const Color(0xff5953ff) : const Color(0xff12744f),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _buildFileContent(),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    DateFormat('h:mm a').format(widget.timestamp),
+                    style: GoogleFonts.archivo(fontSize: 10, color: Colors.grey[100]),
+                  ),
+                  if (widget.isMe) ...[
+                    const SizedBox(width: 4),
                     Text(
-                      DateFormat('h:mm a').format(widget.timestamp),
-                      style: GoogleFonts.archivo(fontSize: 10, color: Colors.grey[100]),
-                    ),
-                    if (widget.isMe) ...[
-                      const SizedBox(width: 4),
-                      Text(
-                        _isSeen ? "seen" : "sent",
-                        style: GoogleFonts.archivo(
-                          fontSize: 10,
-                          color: Colors.blue[100],
-                          fontStyle: FontStyle.italic,
-                        ),
+                      widget.seen ? "seen" : "sent",
+                      style: GoogleFonts.archivo(
+                        fontSize: 10,
+                        color: Colors.blue[100],
+                        fontStyle: FontStyle.italic,
                       ),
-                    ],
+                    ),
                   ],
-                ),
-              ],
-            ),
+                ],
+              ),
+            ],
           ),
         ),
       ),
