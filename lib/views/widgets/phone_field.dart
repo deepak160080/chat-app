@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
-import 'package:chat_app/utils/app_colors.dart';
+import 'package:virtualhelp_chat/utils/app_colors.dart';
 import 'package:google_fonts/google_fonts.dart';
 
 class PhoneNumberTextField extends StatelessWidget {
@@ -16,7 +16,8 @@ class PhoneNumberTextField extends StatelessWidget {
     this.validator,
     this.onChanged,
     this.autofocus = false,
-    this.focusNode, required bool enabled,
+    this.focusNode,
+    required bool enabled,
   });
 
   @override

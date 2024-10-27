@@ -1,8 +1,5 @@
 import 'dart:io';
 
-import 'package:chat_app/services/constants.dart';
-import 'package:chat_app/services/database.dart';
-import 'package:chat_app/services/notification_services.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
@@ -15,6 +12,9 @@ import 'package:intl/intl.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:photo_view/photo_view.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:virtualhelp_chat/services/constants.dart';
+import 'package:virtualhelp_chat/services/database.dart';
+import 'package:virtualhelp_chat/services/notification_services.dart';
 
 class Conversation extends StatefulWidget {
   final String roomId;

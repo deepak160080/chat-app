@@ -1,11 +1,11 @@
-import 'package:chat_app/services/notification_services.dart';
-import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
-import 'package:chat_app/services/helper.dart';
-import 'package:chat_app/utils/app_theme.dart';
-import 'package:chat_app/views/auth/login_page.dart';
-import 'package:chat_app/views/components/chat_room.dart';
-import 'package:chat_app/views/welcome_screen.dart';
+import 'package:flutter/material.dart';
+import 'package:virtualhelp_chat/services/helper.dart';
+import 'package:virtualhelp_chat/services/notification_services.dart';
+import 'package:virtualhelp_chat/utils/app_theme.dart';
+import 'package:virtualhelp_chat/views/auth/login_page.dart';
+import 'package:virtualhelp_chat/views/components/chat_room.dart';
+import 'package:virtualhelp_chat/views/welcome_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -33,16 +33,14 @@ class _MyAppState extends State<MyApp> {
     super.initState();
   }
 
-
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      title: 'Chat App',
+      title: 'Virtual Help ChatApp',
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
       themeMode: ThemeMode.system,
-
       home: isLoggedIn && userType != null ? ChatRoom(userType: userType!) : const WelcomeScreen(),
     );
   }

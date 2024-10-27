@@ -63,7 +63,7 @@ class NotificationService {
     required String body,
   }) async {
     const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
-      'chat_app_channel',
+      'virtualhelp_chat_channel',
       'Chat Notifications',
       importance: Importance.max,
       priority: Priority.high,

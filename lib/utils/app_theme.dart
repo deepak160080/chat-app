@@ -1,7 +1,5 @@
-
-
-import 'package:chat_app/services/constants.dart';
-import 'package:chat_app/utils/app_colors.dart';
+import 'package:virtualhelp_chat/services/constants.dart';
+import 'package:virtualhelp_chat/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 

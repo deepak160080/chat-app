@@ -1,11 +1,11 @@
-import 'package:chat_app/services/auth.dart';
-import 'package:chat_app/services/constants.dart';
-import 'package:chat_app/services/database.dart';
-import 'package:chat_app/views/auth/login_page.dart';
-import 'package:chat_app/views/components/chat_room.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hexcolor/hexcolor.dart';
+import 'package:virtualhelp_chat/services/auth.dart';
+import 'package:virtualhelp_chat/services/constants.dart';
+import 'package:virtualhelp_chat/services/database.dart';
+import 'package:virtualhelp_chat/views/auth/login_page.dart';
+import 'package:virtualhelp_chat/views/components/chat_room.dart';
 
 import '../../services/helper.dart';
 

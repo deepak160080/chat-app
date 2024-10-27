@@ -1,15 +1,15 @@
 import 'dart:io';
 
-import 'package:chat_app/services/validator.dart';
-import 'package:chat_app/utils/app_colors.dart';
-import 'package:chat_app/views/widgets/app_buttons.dart';
-import 'package:chat_app/views/widgets/app_textfield.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:virtualhelp_chat/services/validator.dart';
+import 'package:virtualhelp_chat/utils/app_colors.dart';
+import 'package:virtualhelp_chat/views/widgets/app_buttons.dart';
+import 'package:virtualhelp_chat/views/widgets/app_textfield.dart';
 
 class TeacherAuth extends StatefulWidget {
   const TeacherAuth({super.key});

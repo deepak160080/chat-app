@@ -1,8 +1,8 @@
-import 'package:chat_app/utils/responsive.dart';
-import 'package:chat_app/views/auth/login_page.dart';
-import 'package:chat_app/views/auth/teacher_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:lottie/lottie.dart';
+import 'package:virtualhelp_chat/utils/responsive.dart';
+import 'package:virtualhelp_chat/views/auth/login_page.dart';
+import 'package:virtualhelp_chat/views/auth/teacher_auth.dart';
 
 class WelcomeScreen extends StatelessWidget {
   const WelcomeScreen({super.key});
@@ -36,7 +36,7 @@ class WelcomeScreen extends StatelessWidget {
           const SizedBox(height: 20),
           _buildLoginButton(context, UserType.student),
           const SizedBox(height: 40),
-           _buildCreateTeacherAccountButton(context),
+          _buildCreateTeacherAccountButton(context),
         ],
       ),
     );
@@ -71,12 +71,12 @@ class WelcomeScreen extends StatelessWidget {
               child: _buildLottieAnimation(),
             ),
           ),
-          const SizedBox(width: 60),  // Add space between animation and content
+          const SizedBox(width: 60), // Add space between animation and content
           Expanded(
             flex: 2,
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.start,  // Align content to the left
+              crossAxisAlignment: CrossAxisAlignment.start, // Align content to the left
               children: [
                 _buildWelcomeText(),
                 const SizedBox(height: 20),
@@ -98,10 +98,9 @@ class WelcomeScreen extends StatelessWidget {
   Widget _buildLottieAnimation() {
     return Lottie.network(
       "https://lottie.host/608d58e3-e90e-4cc7-aea1-8247478434af/2M2SXdurdL.json",
-      height: 300,  // Increased height for better visibility
+      height: 300, // Increased height for better visibility
       animate: true,
-      errorBuilder: (context, error, stackTrace) =>
-          const Text('Error loading animation'),
+      errorBuilder: (context, error, stackTrace) => const Text('Error loading animation'),
     );
   }
 
@@ -109,7 +108,7 @@ class WelcomeScreen extends StatelessWidget {
     return const Text(
       'Welcome to Chat App',
       style: TextStyle(
-        fontSize: 36,  
+        fontSize: 36,
         fontWeight: FontWeight.bold,
         color: Colors.white,
       ),
@@ -120,22 +119,21 @@ class WelcomeScreen extends StatelessWidget {
     return const Text(
       'Empowering education through seamless connectivity',
       style: TextStyle(
-        fontSize: 18,  // Increased font size for desktop
+        fontSize: 18, // Increased font size for desktop
         color: Colors.white70,
       ),
     );
   }
 
   Widget _buildLoginButton(BuildContext context, UserType userType) {
-    final String buttonText =
-        userType == UserType.teacher ? 'Login as Teacher' : 'Login as Student';
+    final String buttonText = userType == UserType.teacher ? 'Login as Teacher' : 'Login as Student';
 
     return SizedBox(
       width: Responsive.doubleR(
         context,
         mobile: MediaQuery.of(context).size.width * 0.8,
-        desktop: 300,  
-        tablet: 400, 
+        desktop: 300,
+        tablet: 400,
       ),
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
@@ -161,7 +159,7 @@ class WelcomeScreen extends StatelessWidget {
   //     },
   //     child:  Text(
   //       "Create Teacher's Account",
-  //       style:GoogleFonts.archivo(fontSize: 16),  
+  //       style:GoogleFonts.archivo(fontSize: 16),
   //     ),
   //   );
   // }

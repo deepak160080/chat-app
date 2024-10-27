@@ -1,7 +1,3 @@
-import 'package:chat_app/services/constants.dart';
-import 'package:chat_app/services/database.dart';
-import 'package:chat_app/views/auth/login_page.dart';
-import 'package:chat_app/views/components/chat_room.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_pagination/firebase_pagination.dart';
 import 'package:flutter/material.dart';
@@ -9,6 +5,10 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:hexcolor/hexcolor.dart';
 import 'package:intl/intl.dart';
 import 'package:random_avatar/random_avatar.dart';
+import 'package:virtualhelp_chat/services/constants.dart';
+import 'package:virtualhelp_chat/services/database.dart';
+import 'package:virtualhelp_chat/views/auth/login_page.dart';
+import 'package:virtualhelp_chat/views/components/chat_room.dart';
 
 class GCConversation extends StatefulWidget {
   final String gcName;

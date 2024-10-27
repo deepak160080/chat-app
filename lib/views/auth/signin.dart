@@ -1,11 +1,11 @@
-// import 'package:chat_app/utils/app_colors.dart';
-// import 'package:chat_app/views/components/forgotp.dart';
-// import 'package:chat_app/views/widgets/app_buttons.dart';
+// import 'package:virtualhelp_chat/utils/app_colors.dart';
+// import 'package:virtualhelp_chat/views/components/forgotp.dart';
+// import 'package:virtualhelp_chat/views/widgets/app_buttons.dart';
 // import 'package:flutter/material.dart';
 // import 'package:google_fonts/google_fonts.dart';
-// import 'package:chat_app/services/auth.dart';
-// import 'package:chat_app/services/database.dart';
-// import 'package:chat_app/services/helper.dart';
+// import 'package:virtualhelp_chat/services/auth.dart';
+// import 'package:virtualhelp_chat/services/database.dart';
+// import 'package:virtualhelp_chat/services/helper.dart';
 
 // import '../components/chat_room.dart';
 // class SignIn extends StatefulWidget {

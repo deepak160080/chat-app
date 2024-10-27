@@ -1,17 +1,17 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:chat_app/services/auth.dart';
-import 'package:chat_app/services/constants.dart';
-import 'package:chat_app/services/database.dart';
-import 'package:chat_app/services/helper.dart';
-import 'package:chat_app/views/auth/login_page.dart';
-import 'package:chat_app/views/components/search.dart';
-import 'package:chat_app/views/welcome_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:hexcolor/hexcolor.dart';
 import 'package:intl/intl.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:virtualhelp_chat/services/auth.dart';
+import 'package:virtualhelp_chat/services/constants.dart';
+import 'package:virtualhelp_chat/services/database.dart';
+import 'package:virtualhelp_chat/services/helper.dart';
+import 'package:virtualhelp_chat/views/auth/login_page.dart';
+import 'package:virtualhelp_chat/views/components/search.dart';
+import 'package:virtualhelp_chat/views/welcome_screen.dart';
 
 import 'conversation.dart';
 import 'forgotp.dart';

@@ -1,7 +1,8 @@
-import 'package:chat_app/services/auth.dart';
-import 'package:chat_app/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:virtualhelp_chat/services/auth.dart';
+import 'package:virtualhelp_chat/utils/app_colors.dart';
+
 class ForgotPassword extends StatefulWidget {
   final String? email;
 
@@ -97,7 +98,7 @@ class _ForgotPasswordState extends State<ForgotPassword> {
                       );
                     } catch (e) {
                       print(e);
-                      ScaffoldMessenger.of(context).showSnackBar( SnackBar(
+                      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                         content: Text(
                           e.toString(),
                           style: GoogleFonts.archivo(color: Colors.white),

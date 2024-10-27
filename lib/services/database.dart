@@ -1,4 +1,4 @@
-import 'package:chat_app/services/conversation_model.dart';
+import 'package:virtualhelp_chat/services/conversation_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class DatabaseMethods {

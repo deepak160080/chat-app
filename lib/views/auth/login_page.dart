@@ -1,10 +1,10 @@
-import 'package:chat_app/services/helper.dart';
-import 'package:chat_app/views/components/chat_room.dart';
-import 'package:chat_app/views/widgets/app_buttons.dart';
-import 'package:chat_app/views/widgets/app_textfield.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:virtualhelp_chat/services/helper.dart';
+import 'package:virtualhelp_chat/views/components/chat_room.dart';
+import 'package:virtualhelp_chat/views/widgets/app_buttons.dart';
+import 'package:virtualhelp_chat/views/widgets/app_textfield.dart';
 
 enum UserType { teacher, student }
 
