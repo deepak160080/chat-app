@@ -640,15 +640,15 @@ class ChatRoomTile extends StatelessWidget {
         minWidth: 24,
         minHeight: 24,
       ),
-      decoration: const BoxDecoration(
-        // color: HexColor("#5953ff"),
+      decoration: BoxDecoration(
+        color: HexColor("#5953ff"),
         shape: BoxShape.circle,
       ),
       child: Center(
         child: Text(
           count >= 10 ? '9+' : count.toString(),
           style: GoogleFonts.archivo(
-            // color: Colors.white,
+            color: Colors.white,
             fontSize: 12,
             fontWeight: FontWeight.bold,
           ),
@@ -659,58 +659,46 @@ class ChatRoomTile extends StatelessWidget {
 
   Widget _buildProfileImage() {
     if (svg == null || svg!.isEmpty) {
-      return const CircleAvatar(
-        // backgroundColor: Colors.grey,
-        child: Icon(
+      return CircleAvatar(
+        backgroundColor: Colors.grey[300],
+        radius: 24,
+        child: const Icon(
           Icons.person,
+          color: Colors.white,
+          size: 30,
         ),
       );
     }
 
-    return CachedNetworkImage(
-      imageUrl: svg!,
-      imageBuilder: (context, imageProvider) => Container(
+    return ClipOval(
+      child: CachedNetworkImage(
+        imageUrl: svg!,
         width: 48,
         height: 48,
-        decoration: BoxDecoration(
-          shape: BoxShape.circle,
-          image: DecorationImage(
-            image: imageProvider,
-            fit: BoxFit.cover,
+        fit: BoxFit.cover,
+        placeholder: (context, url) => Shimmer.fromColors(
+          baseColor: Colors.grey[300]!,
+          highlightColor: Colors.grey[100]!,
+          child: Container(
+            width: 48,
+            height: 48,
+            decoration: const BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+            ),
           ),
         ),
-      ),
-      placeholder: (context, url) => Shimmer.fromColors(
-        baseColor: HexColor("#262630"),
-        highlightColor: Colors.grey[700]!,
-        child: Container(
-          width: 48,
-          height: 48,
-          decoration: const BoxDecoration(
-            // color: Colors.white,
-            shape: BoxShape.circle,
+        errorWidget: (context, url, error) => CircleAvatar(
+          backgroundColor: Colors.grey[300],
+          radius: 24,
+          child: const Icon(
+            Icons.person,
+            color: Colors.white,
+            size: 30,
           ),
-        ),
-      ),
-      errorWidget: (context, url, error) => const CircleAvatar(
-        // backgroundColor: Colors.grey,
-        child: Icon(
-          Icons.person,
         ),
       ),
     );
-  }
-
-  void _resetUnreadCounter(BuildContext context, String roomId) {
-    final currentUserId = FirebaseAuth.instance.currentUser?.uid;
-    if (currentUserId != null) {
-      FirebaseFirestore.instance
-          .collection("chatrooms")
-          .doc(roomId)
-          .collection("unreadCount")
-          .doc(currentUserId)
-          .set({'count': 0});
-    }
   }
 
   @override
@@ -756,8 +744,7 @@ class ChatRoomTile extends StatelessWidget {
             return Container(
               margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
               decoration: BoxDecoration(
-                color: isHighlighted ? Theme.of(context).primaryColor : HexColor("#262630"),
-                border: isHighlighted ? Border.all(color: Theme.of(context).primaryColor, width: 1) : null,
+                color: Theme.of(context).brightness == Brightness.dark ? HexColor("#262630") : Colors.white,
                 borderRadius: BorderRadius.circular(20),
                 boxShadow: [
                   BoxShadow(
@@ -793,7 +780,6 @@ class ChatRoomTile extends StatelessWidget {
                       child: Text(
                         username,
                         style: GoogleFonts.archivo(
-                          color: Colors.white,
                           fontWeight: isHighlighted ? FontWeight.bold : FontWeight.normal,
                         ),
                       ),
@@ -801,7 +787,7 @@ class ChatRoomTile extends StatelessWidget {
                     Text(
                       _getTimeAgo(messageTime),
                       style: GoogleFonts.archivo(
-                        color: Colors.white60,
+                        color: Colors.grey,
                         fontSize: 12,
                       ),
                     ),
@@ -810,7 +796,7 @@ class ChatRoomTile extends StatelessWidget {
                 subtitle: Text(
                   lastMessage,
                   style: GoogleFonts.archivo(
-                    color: Colors.white60,
+                    color: Colors.grey,
                     fontSize: 12,
                   ),
                   maxLines: 1,

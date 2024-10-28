@@ -1,5 +1,5 @@
-import 'package:virtualhelp_chat/services/conversation_model.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:virtualhelp_chat/services/conversation_model.dart';
 
 class DatabaseMethods {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -155,15 +155,15 @@ class DatabaseMethods {
     return FirebaseFirestore.instance.collection("chatrooms").where("users", arrayContains: username).snapshots();
   }
 
-  Future<Map<String, dynamic>> getChatRoom(String user1, String user2) async {
-    final data = await FirebaseFirestore.instance
-        .collection("chatrooms")
-        .where("users", arrayContains: user1)
-        .where("users", arrayContains: user2)
-        .get();
-    if (data.docs.isNotEmpty) return data.docs[0].data();
-    return {};
-  }
+  // Future<Map<String, dynamic>> getChatRoom(String user1, String user2) async {
+  //   final data = await FirebaseFirestore.instance
+  //       .collection("chatrooms")
+  //       .where("users", arrayContains: user1)
+  //       .where("users", arrayContains: user2)
+  //       .get();
+  //   if (data.docs.isNotEmpty) return data.docs[0].data();
+  //   return {};
+  // }
 
   getGCs(String username) async {
     return FirebaseFirestore.instance.collection("gc").where("users", arrayContains: username).snapshots();
