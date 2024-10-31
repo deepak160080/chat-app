@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:virtualhelp_chat/services/helper.dart';
 import 'package:virtualhelp_chat/views/components/chat_room.dart';
+import 'package:virtualhelp_chat/views/components/forgotp.dart';
 import 'package:virtualhelp_chat/views/widgets/app_buttons.dart';
 import 'package:virtualhelp_chat/views/widgets/app_textfield.dart';
 
@@ -237,7 +238,14 @@ class _LoginPageState extends State<LoginPage> with SingleTickerProviderStateMix
                         onPressed: _isLoading
                             ? null
                             : () {
-                                // Add forgot password functionality
+                                Navigator.push(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => ForgotPassword(
+                                      email: _emailController.text.trim(),
+                                    ),
+                                  ),
+                                );
                               },
                         child: Text(
                           "Forgot Password?",

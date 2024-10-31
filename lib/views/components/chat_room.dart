@@ -156,95 +156,98 @@ class _ChatRoomState extends State<ChatRoom> {
 
   Widget _buildDrawer(BuildContext context) {
     return Drawer(
-      child: Container(
-        decoration: BoxDecoration(color: Theme.of(context).scaffoldBackgroundColor
-            // color: HexColor("#262630"),
-            ),
-        child: ListView(
-          padding: EdgeInsets.zero,
-          children: [
-            const SizedBox(height: 20),
-            Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildProfileAvatar(),
-                const SizedBox(height: 10),
-                _buildProfileInfo(),
-              ],
-            ),
-            ListTile(
-              leading: const Icon(
-                Icons.person,
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Container(
+          decoration: BoxDecoration(color: Theme.of(context).scaffoldBackgroundColor
+              // color: HexColor("#262630"),
               ),
-              title: Text(
-                'Profile',
-                style: GoogleFonts.archivo(),
+          child: ListView(
+            padding: EdgeInsets.zero,
+            children: [
+              const SizedBox(height: 20),
+              Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _buildProfileAvatar(),
+                  const SizedBox(height: 10),
+                  _buildProfileInfo(),
+                ],
               ),
-              onTap: () {
-                // Handle profile navigation
-                Navigator.pop(context);
-              },
-            ),
-            Consumer<ThemeProvider>(
-              builder: (context, themeProvider, child) {
-                return ListTile(
-                  leading: Icon(
-                    themeProvider.isDarkMode ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
-                    color: themeProvider.isDarkMode ? Colors.white : Colors.black,
-                  ),
-                  title: Text(
-                    'Theme',
-                    style: GoogleFonts.archivo(
+              // ListTile(
+              //   leading: const Icon(
+              //     Icons.person,
+              //   ),
+              //   title: Text(
+              //     'Profile',
+              //     style: GoogleFonts.archivo(),
+              //   ),
+              //   onTap: () {
+              //     // Handle profile navigation
+              //     Navigator.pop(context);
+              //   },
+              // ),
+              Consumer<ThemeProvider>(
+                builder: (context, themeProvider, child) {
+                  return ListTile(
+                    leading: Icon(
+                      themeProvider.isDarkMode ? Icons.dark_mode_rounded : Icons.light_mode_rounded,
                       color: themeProvider.isDarkMode ? Colors.white : Colors.black,
                     ),
-                  ),
-                  trailing: Switch(
-                    value: themeProvider.isDarkMode,
-                    onChanged: (value) {
-                      themeProvider.toggleTheme();
-                    },
-                  ),
-                );
-              },
-            ),
-            // ListTile(
-            //   leading: const Icon(Icons.settings, color: Colors.white),
-            //   title: Text(
-            //     'Settings',
-            //     style: GoogleFonts.archivo(color: Colors.white),
-            //   ),
-            //   onTap: () {
-            //     // Handle settings navigation
-            //     Navigator.pop(context);
-            //   },
-            // ),
-            // ListTile(
-            //   leading: const Icon(Icons.lock_reset, color: Colors.white),
-            //   title: Text(
-            //     'Reset Password',
-            //     style: GoogleFonts.archivo(color: Colors.white),
-            //   ),
-            //   onTap: () {
-            //     Navigator.pop(context);
-            //     Navigator.push(
-            //       context,
-            //       MaterialPageRoute(
-            //         builder: (context) => ForgotPassword(email: Constants.localEmail),
-            //       ),
-            //     );
-            //   },
-            // ),
-            // ListTile(
-            //   leading: const Icon(
-            //     Icons.logout,
-            //   ),
-            //   title: Text(
-            //     'Sign Out',
-            //     style: GoogleFonts.archivo(),
-            //   ),
-            //   onTap: _handleSignOut,
-            // ),
-          ],
+                    title: Text(
+                      'Theme',
+                      style: GoogleFonts.archivo(
+                        color: themeProvider.isDarkMode ? Colors.white : Colors.black,
+                      ),
+                    ),
+                    trailing: Switch(
+                      value: themeProvider.isDarkMode,
+                      onChanged: (value) {
+                        themeProvider.toggleTheme();
+                      },
+                    ),
+                  );
+                },
+              ),
+              // ListTile(
+              //   leading: const Icon(Icons.settings, color: Colors.white),
+              //   title: Text(
+              //     'Settings',
+              //     style: GoogleFonts.archivo(color: Colors.white),
+              //   ),
+              //   onTap: () {
+              //     // Handle settings navigation
+              //     Navigator.pop(context);
+              //   },
+              // ),
+              // ListTile(
+              //   leading: const Icon(Icons.lock_reset, color: Colors.white),
+              //   title: Text(
+              //     'Reset Password',
+              //     style: GoogleFonts.archivo(color: Colors.white),
+              //   ),
+              //   onTap: () {
+              //     Navigator.pop(context);
+              //     Navigator.push(
+              //       context,
+              //       MaterialPageRoute(
+              //         builder: (context) => ForgotPassword(email: Constants.localEmail),
+              //       ),
+              //     );
+              //   },
+              // ),
+              ListTile(
+                leading: const Icon(
+                  Icons.logout,
+                ),
+                title: Text(
+                  'Sign Out',
+                  style: GoogleFonts.archivo(),
+                ),
+                onTap: _handleSignOut,
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -424,7 +427,6 @@ class _ChatRoomState extends State<ChatRoom> {
 
   PreferredSizeWidget _buildAppBar(BuildContext context) {
     return AppBar(
-      iconTheme: const IconThemeData(),
       title: Text(
         widget.userType == UserType.teacher ? "Teachers Chat Rooms" : "Students Chat Rooms",
         style: GoogleFonts.archivo(fontSize: 20),
@@ -508,24 +510,78 @@ class _ChatRoomState extends State<ChatRoom> {
 
   Widget _buildChatRoomTile(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    String otherUsername = _getOtherUsername(data['users'] as List<dynamic>);
-    int unreadCount = _getUnreadCount(doc);
-    DateTime lastMessageTime = DateTime.fromMillisecondsSinceEpoch(_getLastMessageTime(doc));
+    String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-    String? svg = data['svg'] as String?;
-    // Make sure svg is not empty string
-    if (svg != null && svg.trim().isEmpty) {
-      svg = null;
+    // Get the chatroom ID
+    String chatRoomId = data['chatRoomId'] as String;
+
+    // Get the other user's data based on userType
+    Map<String, dynamic>? otherUserData;
+    String? otherUserId;
+
+    if (widget.userType == UserType.student) {
+      otherUserData = data['teacherData'] as Map<String, dynamic>?;
+      otherUserId = data['teacherId'] as String?;
+    } else {
+      otherUserData = data['studentData'] as Map<String, dynamic>?;
+      otherUserId = data['studentId'] as String?;
     }
 
+    // If we don't have structured data, try to get the other user's info from users list
+    if (otherUserData == null || otherUserId == null) {
+      List<dynamic> users = data['users'] as List<dynamic>;
+      String otherUsername = users.firstWhere(
+        (user) => user != Constants.localUsername,
+        orElse: () => "Unknown User",
+      ) as String;
+
+      // Determine which collection to query based on userType
+      String otherUserCollection = widget.userType == UserType.student ? 'teachers' : 'students';
+
+      // Query Firestore for the other user's data
+      return StreamBuilder<QuerySnapshot>(
+        stream: FirebaseFirestore.instance
+            .collection(otherUserCollection)
+            .where('name', isEqualTo: otherUsername)
+            .limit(1)
+            .snapshots(),
+        builder: (context, snapshot) {
+          if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            return ChatRoomTile(
+              username: otherUsername,
+              roomId: chatRoomId,
+              svg: null,
+              unreadMessages: _getUnreadCount(doc),
+              receiverId: null,
+              lastMessageTime: DateTime.fromMillisecondsSinceEpoch(_getLastMessageTime(doc)),
+              isHighlighted: _getUnreadCount(doc) > 0,
+            );
+          }
+
+          Map<String, dynamic> userData = snapshot.data!.docs.first.data() as Map<String, dynamic>;
+
+          return ChatRoomTile(
+            username: userData['name'] as String? ?? otherUsername,
+            roomId: chatRoomId,
+            svg: userData['svg'] as String?,
+            unreadMessages: _getUnreadCount(doc),
+            receiverId: snapshot.data!.docs.first.id,
+            lastMessageTime: DateTime.fromMillisecondsSinceEpoch(_getLastMessageTime(doc)),
+            isHighlighted: _getUnreadCount(doc) > 0,
+          );
+        },
+      );
+    }
+
+    // If we have structured data, use it directly
     return ChatRoomTile(
-      username: otherUsername,
-      roomId: data['chatRoomId'] as String,
-      svg: svg,
-      unreadMessages: unreadCount,
-      receiverId: widget.receiverId,
-      lastMessageTime: lastMessageTime,
-      isHighlighted: unreadCount > 0,
+      username: otherUserData['name'] as String? ?? 'Unknown User',
+      roomId: chatRoomId,
+      svg: otherUserData['svg'] as String?,
+      unreadMessages: _getUnreadCount(doc),
+      receiverId: otherUserId,
+      lastMessageTime: DateTime.fromMillisecondsSinceEpoch(_getLastMessageTime(doc)),
+      isHighlighted: _getUnreadCount(doc) > 0,
     );
   }
 }
@@ -658,45 +714,45 @@ class ChatRoomTile extends StatelessWidget {
   }
 
   Widget _buildProfileImage() {
-    if (svg == null || svg!.isEmpty) {
-      return CircleAvatar(
-        backgroundColor: Colors.grey[300],
-        radius: 24,
-        child: const Icon(
-          Icons.person,
-          color: Colors.white,
-          size: 30,
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: Border.all(
+          color: Colors.grey.withOpacity(0.2),
+          width: 1,
         ),
-      );
-    }
-
-    return ClipOval(
-      child: CachedNetworkImage(
-        imageUrl: svg!,
-        width: 48,
-        height: 48,
-        fit: BoxFit.cover,
-        placeholder: (context, url) => Shimmer.fromColors(
-          baseColor: Colors.grey[300]!,
-          highlightColor: Colors.grey[100]!,
-          child: Container(
-            width: 48,
-            height: 48,
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              shape: BoxShape.circle,
-            ),
-          ),
-        ),
-        errorWidget: (context, url, error) => CircleAvatar(
-          backgroundColor: Colors.grey[300],
-          radius: 24,
-          child: const Icon(
-            Icons.person,
-            color: Colors.white,
-            size: 30,
-          ),
-        ),
+      ),
+      child: ClipOval(
+        child: svg != null && svg!.isNotEmpty
+            ? CachedNetworkImage(
+                imageUrl: svg!,
+                fit: BoxFit.cover,
+                placeholder: (context, url) => Shimmer.fromColors(
+                  baseColor: Colors.grey[300]!,
+                  highlightColor: Colors.grey[100]!,
+                  child: Container(
+                    color: Colors.white,
+                  ),
+                ),
+                errorWidget: (context, url, error) => CircleAvatar(
+                  backgroundColor: Colors.grey[300],
+                  child: const Icon(
+                    Icons.person,
+                    color: Colors.white,
+                    size: 30,
+                  ),
+                ),
+              )
+            : CircleAvatar(
+                backgroundColor: Colors.grey[300],
+                child: const Icon(
+                  Icons.person,
+                  color: Colors.white,
+                  size: 30,
+                ),
+              ),
       ),
     );
   }
@@ -767,7 +823,7 @@ class ChatRoomTile extends StatelessWidget {
                       builder: (context) => Conversation(
                         roomId: roomId,
                         name: username,
-                        svg: svg ?? Constants.localSvg,
+                        svg: svg ?? "",
                         receiverId: receiverId ?? "",
                       ),
                     ),
