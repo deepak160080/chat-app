@@ -143,10 +143,6 @@ class DatabaseMethods {
         .snapshots();
   }
 
-  // conversation(String roomId, Map<String, dynamic> userMap) async{
-  //   return await FirebaseFirestore.instance.collection("chatrooms").doc(roomId).collection("chats").add(userMap);
-  // }
-
   gcConversation(String gcName, Map<String, dynamic> userMap) async {
     return await FirebaseFirestore.instance.collection("gc").doc(gcName).collection("chats").add(userMap);
   }

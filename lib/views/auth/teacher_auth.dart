@@ -6,8 +6,8 @@ import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image_picker/image_picker.dart';
+import 'package:virtualhelp_chat/services/constants.dart';
 import 'package:virtualhelp_chat/services/validator.dart';
-import 'package:virtualhelp_chat/utils/app_colors.dart';
 import 'package:virtualhelp_chat/views/widgets/app_buttons.dart';
 import 'package:virtualhelp_chat/views/widgets/app_textfield.dart';
 
@@ -43,7 +43,7 @@ class _TeacherAuthState extends State<TeacherAuth> {
         height: 100,
         decoration: BoxDecoration(
           shape: BoxShape.circle,
-          color: Colors.grey[200],
+          color: Theme.of(context).colorScheme.surface,
           image: _image != null
               ? DecorationImage(
                   image: FileImage(_image!),
@@ -51,13 +51,7 @@ class _TeacherAuthState extends State<TeacherAuth> {
                 )
               : null,
         ),
-        child: _image == null
-            ? Icon(
-                Icons.camera_alt,
-                size: 50,
-                color: Colors.grey[800],
-              )
-            : null,
+        child: _image == null ? Icon(Icons.camera_alt, size: 50, color: Theme.of(context).colorScheme.onSurface) : null,
       ),
     );
   }
@@ -80,17 +74,35 @@ class _TeacherAuthState extends State<TeacherAuth> {
     if (_image == null) return null;
 
     try {
-      // Create a reference to the file location
-      final ref = _storage.ref().child('profile_images').child('$userId.jpg');
+      final String collection = _selectedRole?.toLowerCase() == 'student' ? 'students' : 'teachers';
+      final ref = _storage.ref().child(collection).child('profile_images').child('$userId.jpg');
 
-      // Upload the file with specific metadata to maintain quality
+      // Add specific metadata for better image handling
       final metadata = SettableMetadata(
         contentType: 'image/jpeg',
-        customMetadata: {'picked-file-path': _image!.path},
+        customMetadata: {
+          'userId': userId,
+          'userRole': _selectedRole ?? 'unknown',
+          'uploadDate': DateTime.now().toIso8601String(),
+        },
       );
 
-      await ref.putFile(_image!, metadata);
-      return await ref.getDownloadURL();
+      // Upload file with metadata
+      final uploadTask = await ref.putFile(_image!, metadata);
+
+      if (uploadTask.state == TaskState.success) {
+        // Get download URL
+        final downloadUrl = await ref.getDownloadURL();
+
+        // Update user document with image URL
+        await _firestore.collection(collection).doc(userId).update({
+          'svg': downloadUrl,
+          'lastImageUpdate': FieldValue.serverTimestamp(),
+        });
+
+        return downloadUrl;
+      }
+      return null;
     } catch (e) {
       print('Error uploading image: $e');
       return null;
@@ -106,17 +118,15 @@ class _TeacherAuthState extends State<TeacherAuth> {
     });
 
     try {
-      // Create user with email and password
       final UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text,
       );
 
       if (userCredential.user != null) {
-        // Upload image and get URL
         final String? imageUrl = await _uploadImage(userCredential.user!.uid);
+        final String collection = _selectedRole?.toLowerCase() == 'student' ? 'students' : 'teachers';
 
-        // Prepare user data
         final userData = {
           'name': _nameController.text.trim(),
           'email': _emailController.text.trim(),
@@ -127,33 +137,20 @@ class _TeacherAuthState extends State<TeacherAuth> {
           'svg': imageUrl,
         };
 
-        // Determine collection based on role
-        final String collection = _selectedRole?.toLowerCase() == 'student' ? 'students' : 'teachers';
-
-        // Save user data to Firestore
         await _firestore.collection(collection).doc(userCredential.user!.uid).set(userData);
 
-        // Update display name
-        await userCredential.user!.updateDisplayName(_nameController.text.trim());
+        // Store locally for immediate use
+        Constants.localUserId = userCredential.user!.uid;
+        Constants.localRole = _selectedRole ?? '';
 
-        // Show success message and navigate
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('Account created successfully!'),
-              backgroundColor: Colors.green,
-            ),
-          );
-          Navigator.pop(context); // Or navigate to your desired screen
+          ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account created successfully!')));
+          Navigator.pop(context);
         }
       }
-    } on FirebaseAuthException catch (e) {
-      setState(() {
-        _errorMessage = _getFirebaseErrorMessage(e.code);
-      });
     } catch (e) {
       setState(() {
-        _errorMessage = 'An unexpected error occurred. Please try again.';
+        _errorMessage = e.toString();
       });
     } finally {
       if (mounted) {
@@ -179,17 +176,18 @@ class _TeacherAuthState extends State<TeacherAuth> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         elevation: 0,
         title: Text(
           "New Account",
           style: GoogleFonts.archivo(
-            color: AppColors.primaryTextColor,
+            color: colorScheme.onPrimary,
             fontWeight: FontWeight.bold,
           ),
         ),
-        backgroundColor: AppColors.primaryColor,
+        backgroundColor: colorScheme.primary,
       ),
       body: SingleChildScrollView(
         child: Padding(
@@ -204,7 +202,7 @@ class _TeacherAuthState extends State<TeacherAuth> {
                   style: GoogleFonts.archivo(
                     fontSize: 24,
                     fontWeight: FontWeight.bold,
-                    color: AppColors.primaryTextColor,
+                    color: colorScheme.onSurface,
                   ),
                   textAlign: TextAlign.center,
                 ),
@@ -216,7 +214,7 @@ class _TeacherAuthState extends State<TeacherAuth> {
                     padding: const EdgeInsets.only(bottom: 16.0),
                     child: Text(
                       _errorMessage!,
-                      style: const TextStyle(color: Colors.red),
+                      style: TextStyle(color: colorScheme.error),
                       textAlign: TextAlign.center,
                     ),
                   ),
@@ -231,7 +229,12 @@ class _TeacherAuthState extends State<TeacherAuth> {
                 _buildRoleDropdownField(),
                 const SizedBox(height: 24),
                 _isLoading
-                    ? const Center(child: CircularProgressIndicator())
+                    ? Center(
+                        child: CircularProgressIndicator(
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          colorScheme.primary,
+                        ),
+                      ))
                     : AppButton(
                         onPressed: _createAccount,
                         text: 'Create Account',
