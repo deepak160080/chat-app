@@ -118,7 +118,7 @@ class _ChatRoomState extends State<ChatRoom> {
 
   Future<void> _loadChatStreams() async {
     chatRoomStream = _database.getChatRooms(Constants.localUsername);
-    gcStream = await _database.getGCs(Constants.localUsername);
+    // gcStream = await _database.getGCs(Constants.localUsername);
   }
 
   Future<void> _handleSignOut() async {
@@ -618,7 +618,7 @@ Future<void> updateUnreadCount(String roomId, String userId, {bool reset = false
       'lastMessageTime': DateTime.now().millisecondsSinceEpoch,
     });
   } catch (e) {
-    print('Error updating unread count: $e');
+    debugPrint('Error updating unread count: $e');
   }
 }
 
@@ -632,10 +632,7 @@ void resetUnreadCounter(String roomId) async {
 
 Widget _buildErrorMessage(String error) {
   return Center(
-    child: Text(
-      'Error: $error',
-      style: GoogleFonts.archivo(color: Colors.red),
-    ),
+    child: Text('Error: $error', style: GoogleFonts.archivo(color: Colors.red)),
   );
 }
 
@@ -696,18 +693,11 @@ class ChatRoomTile extends StatelessWidget {
         minWidth: 24,
         minHeight: 24,
       ),
-      decoration: BoxDecoration(
-        color: HexColor("#5953ff"),
-        shape: BoxShape.circle,
-      ),
+      decoration: BoxDecoration(color: HexColor("#5953ff"), shape: BoxShape.circle),
       child: Center(
         child: Text(
           count >= 10 ? '9+' : count.toString(),
-          style: GoogleFonts.archivo(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
-          ),
+          style: GoogleFonts.archivo(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
         ),
       ),
     );
@@ -738,20 +728,12 @@ class ChatRoomTile extends StatelessWidget {
                 ),
                 errorWidget: (context, url, error) => CircleAvatar(
                   backgroundColor: Colors.grey[300],
-                  child: const Icon(
-                    Icons.person,
-                    color: Colors.white,
-                    size: 30,
-                  ),
+                  child: const Icon(Icons.person, color: Colors.white, size: 30),
                 ),
               )
             : CircleAvatar(
                 backgroundColor: Colors.grey[300],
-                child: const Icon(
-                  Icons.person,
-                  color: Colors.white,
-                  size: 30,
-                ),
+                child: const Icon(Icons.person, color: Colors.white, size: 30),
               ),
       ),
     );

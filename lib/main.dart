@@ -49,21 +49,17 @@ class _MyAppState extends State<MyApp> {
   getLogStatus() async {
     await _helper.getLogStatus().then((a) {
       print("LogStatus: $a");
-      setState(() {
-        if (a != null) {
-          isLoggedIn = a;
-        }
-      });
+      if (a != null) isLoggedIn = a;
+      setState(() {});
     });
   }
 
   getUserType() async {
     await _helper.getUserType().then((type) {
-      setState(() {
-        if (type != null) {
-          userType = type == 'teacher' ? UserType.teacher : UserType.student;
-        }
-      });
+      if (type != null) {
+        userType = type == 'teacher' ? UserType.teacher : UserType.student;
+      }
+      setState(() {});
     });
   }
 }
