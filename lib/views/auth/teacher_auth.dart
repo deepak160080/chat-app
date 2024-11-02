@@ -71,40 +71,65 @@ class _TeacherAuthState extends State<TeacherAuth> {
   }
 
   Future<String?> _uploadImage(String userId) async {
-    if (_image == null) return null;
+    if (_image == null) {
+      debugPrint('No image selected for upload');
+      return null;
+    }
 
     try {
-      final String collection = _selectedRole?.toLowerCase() == 'student' ? 'students' : 'teachers';
-      final ref = _storage.ref().child(collection).child('profile_images').child('$userId.jpg');
+      // Define valid roles to prevent typos and make maintenance easier
+      const validRoles = {'student', 'teacher'};
+      final String role = (_selectedRole?.toLowerCase() ?? 'unknown');
+      final String collection = validRoles.contains(role) ? '${role}s' : 'users';
+
+      // Create a reference to the image location
+      final ref = _storage
+          .ref()
+          .child(collection)
+          .child('profile_images')
+          .child('$userId-${DateTime.now().millisecondsSinceEpoch}.jpg');
 
       // Add specific metadata for better image handling
       final metadata = SettableMetadata(
         contentType: 'image/jpeg',
         customMetadata: {
           'userId': userId,
-          'userRole': _selectedRole ?? 'unknown',
+          'userRole': role,
           'uploadDate': DateTime.now().toIso8601String(),
+          'fileName': ref.name,
         },
       );
 
-      // Upload file with metadata
-      final uploadTask = await ref.putFile(_image!, metadata);
+      // Upload file with metadata and track progress if needed
+      final uploadTask = ref.putFile(_image!, metadata);
 
-      if (uploadTask.state == TaskState.success) {
-        // Get download URL
+      // Optional: Monitor upload progress
+      uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
+        final progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+        debugPrint('Upload progress: $progress%');
+      });
+
+      // Wait for upload completion
+      await uploadTask;
+
+      // Get and return download URL if upload was successful
+      if (uploadTask.snapshot.state == TaskState.success) {
         final downloadUrl = await ref.getDownloadURL();
-
-        // Update user document with image URL
-        await _firestore.collection(collection).doc(userId).update({
-          'svg': downloadUrl,
-          'lastImageUpdate': FieldValue.serverTimestamp(),
-        });
-
+        debugPrint('Image uploaded successfully: ${ref.name}');
         return downloadUrl;
       }
+
+      debugPrint('Upload completed but state was not success');
+      return null;
+    } on FirebaseException catch (e) {
+      debugPrint('Firebase error uploading image: ${e.message}');
+      // You might want to throw the error instead of returning null
+      // throw Exception('Failed to upload image: ${e.message}');
       return null;
     } catch (e) {
-      print('Error uploading image: $e');
+      debugPrint('Error uploading image: $e');
+      // You might want to throw the error instead of returning null
+      // throw Exception('Failed to upload image: $e');
       return null;
     }
   }
@@ -142,6 +167,7 @@ class _TeacherAuthState extends State<TeacherAuth> {
         // Store locally for immediate use
         Constants.localUserId = userCredential.user!.uid;
         Constants.localRole = _selectedRole ?? '';
+        Constants.localSvg = imageUrl ?? '';
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Account created successfully!')));
