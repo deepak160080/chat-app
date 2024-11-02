@@ -4,6 +4,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:virtualhelp_chat/services/constants.dart';
+import 'package:virtualhelp_chat/services/database.dart';
+import 'package:virtualhelp_chat/services/helper.dart';
 import 'package:virtualhelp_chat/views/components/conversation.dart';
 import 'package:virtualhelp_chat/views/widgets/app_textfield.dart';
 
@@ -153,19 +156,37 @@ class _SearchState extends State<Search> {
     );
   }
 
-  void _onTeacherSelected(TeacherModel teacher) {
+  String getChatRoomId(String a, String b) {
+    if (a.substring(0, 1).codeUnitAt(0) > b.substring(0, 1).codeUnitAt(0)) {
+      return "${b}_$a";
+    } else {
+      return "${a}_$b";
+    }
+  }
+
+  Future<void> _onTeacherSelected(TeacherModel teacher) async {
     _saveRecentSearch(teacher.name); // Save the search when a teacher is selected
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => Conversation(
-          roomId: teacher.id,
-          svg: teacher.svg,
-          name: teacher.name,
-          receiverId: teacher.id,
-        ),
-      ),
-    );
+
+    final username = await Helper().getName() ?? "";
+    String roomId = getChatRoomId(teacher.name, username);
+    List<String> users = [teacher.name, username];
+    Map<String, dynamic> chatRoomMap = {
+      "chatRoomId": roomId,
+      "users": users,
+      // "userSvg": usersSvg,
+      "unreadMessages": {teacher.name: 0, Constants.localUsername: 0}
+    };
+    await DatabaseMethods().createChatRoom(roomId, chatRoomMap).then((a) {
+      Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(
+              builder: (context) => Conversation(
+                    roomId: roomId,
+                    svg: teacher.svg,
+                    name: teacher.name,
+                    receiverId: teacher.id,
+                  )));
+    });
   }
 
   @override
