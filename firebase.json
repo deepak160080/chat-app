@@ -1,1 +1,17 @@
-{"flutter":{"platforms":{"android":{"default":{"projectId":"chat-app-schools","appId":"1:1057229849830:android:a17968ed410bd63299a727","fileOutput":"android/app/google-services.json"}},"dart":{"lib/firebase_options.dart":{"projectId":"chat-app-schools","configurations":{"android":"1:1057229849830:android:a17968ed410bd63299a727","ios":"1:1057229849830:ios:eb0614fce269ba1c99a727","macos":"1:1057229849830:ios:434d70a8b49b6ae399a727","web":"1:1057229849830:web:c2ecdedf5a4c3c6399a727","windows":"1:1057229849830:web:c2ecdedf5a4c3c6399a727"}}}}}}
+{
+  "hosting": {
+    "site": "virtual-help-chat-app",
+    "public": "build/web",
+    "ignore": [
+      "firebase.json",
+      "**/.*",
+      "**/node_modules/**"
+    ],
+    "rewrites": [
+      {
+        "source": "**",
+        "destination": "/index.html"
+      }
+    ]
+  }
+}

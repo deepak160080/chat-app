@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "chat-app-schools"
-  }
+  },
+  "targets": {
+    "chat-app-schools": {
+      "hosting": {
+        "virtual-help-chat-app": [
+          "virtual-help-chat-app"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }

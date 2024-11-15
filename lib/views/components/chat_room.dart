@@ -150,7 +150,14 @@ class _ChatRoomState extends State<ChatRoom> {
       drawer: _buildDrawer(context),
       appBar: _buildAppBar(context),
       floatingActionButton: widget.userType == UserType.student ? _buildFloatingActionButton(context) : null,
-      body: RefreshIndicator(onRefresh: () async => await _initializeUserData(), child: _buildBody()),
+      body: RefreshIndicator(
+        onRefresh: () async => await _initializeUserData(),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            return _buildResponsiveBody(constraints);
+          },
+        ),
+      ),
     );
   }
 
@@ -331,6 +338,90 @@ class _ChatRoomState extends State<ChatRoom> {
     );
   }
 
+  Widget _buildResponsiveBody(BoxConstraints constraints) {
+    // Desktop layout (width > 900)
+    if (constraints.maxWidth > 900) {
+      return Row(
+        children: [
+          // Side panel (30% width)
+          Container(
+            width: constraints.maxWidth * 0.3,
+            decoration: BoxDecoration(
+              border: Border(
+                right: BorderSide(
+                  color: Theme.of(context).dividerColor,
+                  width: 1,
+                ),
+              ),
+            ),
+            child: Column(
+              children: [
+                _buildViewToggle(),
+                Expanded(child: _currentView == ChatViewType.chats ? chatRoomList() : const SizedBox.shrink()),
+              ],
+            ),
+          ),
+          // Main content area (70% width)
+          Expanded(
+            child: Center(
+              child: Text(
+                'Select a chat to start messaging',
+                style: GoogleFonts.archivo(
+                  fontSize: 18,
+                  color: Theme.of(context).textTheme.bodyLarge?.color?.withOpacity(0.6),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+    // Tablet layout (600 < width <= 900)
+    else if (constraints.maxWidth > 600) {
+      return Column(
+        children: [
+          _buildViewToggle(),
+          Expanded(
+            child: _currentView == ChatViewType.chats
+                ? GridView.builder(
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 2,
+                      childAspectRatio: 2,
+                      crossAxisSpacing: 16,
+                      mainAxisSpacing: 16,
+                    ),
+                    itemBuilder: (context, index) {
+                      if (_isLoading) {
+                        return const Center(child: CircularProgressIndicator());
+                      }
+                      return StreamBuilder<QuerySnapshot>(
+                        stream: chatRoomStream as Stream<QuerySnapshot>?,
+                        builder: (context, snapshot) {
+                          if (!snapshot.hasData) return const SizedBox();
+                          final sortedDocs = snapshot.data!.docs.toList()..sort((a, b) => _compareChats(a, b));
+                          if (index >= sortedDocs.length) return const SizedBox();
+                          return _buildChatRoomTile(sortedDocs[index]);
+                        },
+                      );
+                    },
+                  )
+                : const SizedBox.shrink(),
+          ),
+        ],
+      );
+    }
+    // Mobile layout (width <= 600)
+    else {
+      return Column(
+        children: [
+          _buildViewToggle(),
+          Expanded(child: _currentView == ChatViewType.chats ? chatRoomList() : const SizedBox.shrink()),
+        ],
+      );
+    }
+  }
+
   Widget _buildProfileInfo() {
     return Column(
       children: [
@@ -508,14 +599,15 @@ class _ChatRoomState extends State<ChatRoom> {
     }
   }
 
+  @override
   Widget _buildChatRoomTile(DocumentSnapshot doc) {
+    final isDesktop = MediaQuery.of(context).size.width > 900;
+    final isTablet = MediaQuery.of(context).size.width > 600 && MediaQuery.of(context).size.width <= 900;
+
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     String currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
-
-    // Get the chatroom ID
     String chatRoomId = data['chatRoomId'] as String;
 
-    // Get the other user's data based on userType
     Map<String, dynamic>? otherUserData;
     String? otherUserId;
 
@@ -527,7 +619,6 @@ class _ChatRoomState extends State<ChatRoom> {
       otherUserId = data['studentId'] as String?;
     }
 
-    // If we don't have structured data, try to get the other user's info from users list
     if (otherUserData == null || otherUserId == null) {
       List<dynamic> users = data['users'] as List<dynamic>;
       String otherUsername = users.firstWhere(
@@ -535,10 +626,8 @@ class _ChatRoomState extends State<ChatRoom> {
         orElse: () => "Unknown User",
       ) as String;
 
-      // Determine which collection to query based on userType
       String otherUserCollection = widget.userType == UserType.student ? 'teachers' : 'students';
 
-      // Query Firestore for the other user's data
       return StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance
             .collection(otherUserCollection)
@@ -555,6 +644,8 @@ class _ChatRoomState extends State<ChatRoom> {
               receiverId: null,
               lastMessageTime: DateTime.fromMillisecondsSinceEpoch(_getLastMessageTime(doc)),
               isHighlighted: _getUnreadCount(doc) > 0,
+              isDesktop: isDesktop,
+              isTablet: isTablet,
             );
           }
 
@@ -568,12 +659,13 @@ class _ChatRoomState extends State<ChatRoom> {
             receiverId: snapshot.data!.docs.first.id,
             lastMessageTime: DateTime.fromMillisecondsSinceEpoch(_getLastMessageTime(doc)),
             isHighlighted: _getUnreadCount(doc) > 0,
+            isDesktop: isDesktop,
+            isTablet: isTablet,
           );
         },
       );
     }
 
-    // If we have structured data, use it directly
     return ChatRoomTile(
       username: otherUserData['name'] as String? ?? 'Unknown User',
       roomId: chatRoomId,
@@ -582,6 +674,8 @@ class _ChatRoomState extends State<ChatRoom> {
       receiverId: otherUserId,
       lastMessageTime: DateTime.fromMillisecondsSinceEpoch(_getLastMessageTime(doc)),
       isHighlighted: _getUnreadCount(doc) > 0,
+      isDesktop: isDesktop,
+      isTablet: isTablet,
     );
   }
 }
@@ -657,6 +751,8 @@ class ChatRoomTile extends StatelessWidget {
   final String? receiverId;
   final DateTime lastMessageTime;
   final bool isHighlighted;
+  final bool isDesktop;
+  final bool isTablet;
 
   const ChatRoomTile({
     super.key,
@@ -667,6 +763,8 @@ class ChatRoomTile extends StatelessWidget {
     required this.unreadMessages,
     required this.receiverId,
     required this.lastMessageTime,
+    required this.isDesktop,
+    required this.isTablet,
   });
 
   String _getTimeAgo(DateTime dateTime) {
@@ -780,10 +878,13 @@ class ChatRoomTile extends StatelessWidget {
             }
 
             return Container(
-              margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+              margin: EdgeInsets.symmetric(
+                vertical: 4,
+                horizontal: isTablet ? 8 : 16,
+              ),
               decoration: BoxDecoration(
                 color: Theme.of(context).brightness == Brightness.dark ? HexColor("#262630") : Colors.white,
-                borderRadius: BorderRadius.circular(20),
+                borderRadius: BorderRadius.circular(isTablet ? 15 : 20),
                 boxShadow: [
                   BoxShadow(
                     color: Colors.black.withOpacity(0.1),
@@ -793,6 +894,10 @@ class ChatRoomTile extends StatelessWidget {
                 ],
               ),
               child: ListTile(
+                contentPadding: EdgeInsets.symmetric(
+                  horizontal: isTablet ? 8 : 16,
+                  vertical: isTablet ? 4 : 8,
+                ),
                 onTap: () {
                   final currentUserId = FirebaseAuth.instance.currentUser?.uid;
                   if (currentUserId != null) {
@@ -811,7 +916,11 @@ class ChatRoomTile extends StatelessWidget {
                     ),
                   );
                 },
-                leading: _buildProfileImage(),
+                leading: SizedBox(
+                  width: isTablet ? 40 : 48,
+                  height: isTablet ? 40 : 48,
+                  child: _buildProfileImage(),
+                ),
                 title: Row(
                   children: [
                     Expanded(
@@ -819,6 +928,7 @@ class ChatRoomTile extends StatelessWidget {
                         username,
                         style: GoogleFonts.archivo(
                           fontWeight: isHighlighted ? FontWeight.bold : FontWeight.normal,
+                          fontSize: isTablet ? 14 : 16,
                         ),
                       ),
                     ),
@@ -826,7 +936,7 @@ class ChatRoomTile extends StatelessWidget {
                       _getTimeAgo(messageTime),
                       style: GoogleFonts.archivo(
                         color: Colors.grey,
-                        fontSize: 12,
+                        fontSize: isTablet ? 10 : 12,
                       ),
                     ),
                   ],
@@ -835,7 +945,7 @@ class ChatRoomTile extends StatelessWidget {
                   lastMessage,
                   style: GoogleFonts.archivo(
                     color: Colors.grey,
-                    fontSize: 12,
+                    fontSize: isTablet ? 10 : 12,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
