@@ -1,4 +1,4 @@
-package com.virtualhelp.chatapp;
+package virtualhelp.chatapp.app;
 
 import io.flutter.embedding.android.FlutterActivity;
 

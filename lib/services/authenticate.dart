@@ -1,5 +1,4 @@
-
-import 'package:chat_app/views/auth/login_page.dart';
+import 'package:virtualhelp_chat/views/auth/login_page.dart';
 import 'package:flutter/material.dart';
 
 class Authenticate extends StatefulWidget {
@@ -28,8 +27,9 @@ class _AuthenticateState extends State<Authenticate> {
           child: child,
         );
       },
-      child: LoginPage(userType: _showSignIn ? UserType.student : UserType.teacher,),
-          
+      child: LoginPage(
+        userType: _showSignIn ? UserType.student : UserType.teacher,
+      ),
     );
   }
 }

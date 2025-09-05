@@ -1,21 +1,19 @@
-
-
-import 'package:chat_app/services/constants.dart';
-import 'package:chat_app/utils/app_colors.dart';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:virtualhelp_chat/services/constants.dart';
+import 'package:virtualhelp_chat/utils/app_colors.dart';
 
 class AppTheme {
   static ThemeData lightTheme = ThemeData(
     useMaterial3: true,
     brightness: Brightness.light,
-    colorScheme: const ColorScheme.light(
+    colorScheme: ColorScheme.light(
       primary: AppColors.primaryColor,
       onPrimary: Colors.white,
       secondary: AppColors.primaryLightColor,
       onSecondary: Colors.white,
       surface: Colors.white,
-      onSurface: Colors.black,
+      onSurface: Constants.backgroundColor,
       error: AppColors.errorColor,
       onError: Colors.white,
     ),
@@ -34,15 +32,15 @@ class AppTheme {
       displayLarge: GoogleFonts.archivo(
         fontSize: 32,
         fontWeight: FontWeight.bold,
-        color: Colors.black,
+        color: Constants.backgroundColor,
       ),
       bodyLarge: GoogleFonts.archivo(
         fontSize: 16,
-        color: Colors.black87,
+        color: Constants.backgroundColor,
       ),
       bodyMedium: GoogleFonts.archivo(
         fontSize: 14,
-        color: Colors.black87,
+        color: Constants.backgroundColor,
       ),
     ),
     elevatedButtonTheme: ElevatedButtonThemeData(

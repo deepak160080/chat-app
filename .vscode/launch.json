@@ -1,0 +1,28 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+      // flutter build apk --release --dart-define=isDebugMode=true -t lib/main.dart
+      {
+        "name": "Staging Debug",
+        "request": "launch",
+        "type": "dart",
+        "flutterMode": "debug",
+        "args": [
+          "--dart-define=isDebugMode=true"
+        ],
+      
+      },
+      {
+        "name": "Staging Release",
+        "request": "launch",
+        "type": "dart",
+        "flutterMode": "release",
+        "args": [
+          "--dart-define=isDebugMode=true"
+
+        ],
+      
+      },
+     
+    ]
+  }

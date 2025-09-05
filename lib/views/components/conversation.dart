@@ -1,91 +1,172 @@
-import 'package:chat_app/services/constants.dart';
-import 'package:chat_app/services/database.dart';
-import 'package:flutter/material.dart';
+import 'dart:io';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:file_picker/file_picker.dart';
-import 'package:font_awesome_flutter/font_awesome_flutter.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:hexcolor/hexcolor.dart';
+import 'package:http/http.dart' as http;
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
-import 'package:random_avatar/random_avatar.dart';
-import 'package:flutter_chat_ui/flutter_chat_ui.dart';
-import 'package:flutter_chat_types/flutter_chat_types.dart' as types;
-import 'dart:io';
-import 'package:open_file/open_file.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:http/http.dart' as http;
+import 'package:virtualhelp_chat/services/constants.dart';
+import 'package:virtualhelp_chat/services/database.dart';
 
 class Conversation extends StatefulWidget {
   final String roomId;
   final String svg;
   final String name;
+  final String receiverId;
 
   const Conversation({
     super.key,
     required this.roomId,
     required this.svg,
     required this.name,
+    required this.receiverId,
   });
 
   @override
-  _ConversationState createState() => _ConversationState();
+  State<Conversation> createState() => _ConversationState();
 }
 
 class _ConversationState extends State<Conversation> {
   final DatabaseMethods _databaseMethods = DatabaseMethods();
   final FirebaseStorage _storage = FirebaseStorage.instance;
   final ImagePicker _imagePicker = ImagePicker();
-  List<types.Message> _messages = [];
-  late types.User _user;
+  final TextEditingController _messageController = TextEditingController();
+  final ScrollController _scrollController = ScrollController();
+  // final NotificationService _notificationService = NotificationService();
+  XFile? _selectedImage;
+  final List<String> _restrictedWords = [
+    'address',
+    'phone',
+    'email',
+    'social security',
+    'ssn',
+    'bank account',
+    'credit card',
+    'debit card',
+    'PIN',
+    'password',
+    'username',
+    'login',
+    'passport',
+    'ID',
+    'driver\'s license',
+    'birthdate',
+    'birthday',
+    'first name',
+    'last name',
+    'full name',
+    'home address',
+    'work address',
+    'school address',
+    'city',
+    'state',
+    'country',
+    'zip code',
+    'postal code',
+    'mobile number',
+    'landline',
+    'street',
+    'apartment',
+    'user ID',
+    'IP address',
+    'security question',
+    'mother\'s maiden name',
+    'medical record',
+    'health info',
+    'insurance number',
+    'social media',
+    'Facebook',
+    'Instagram',
+    'Twitter',
+    'TikTok',
+    'LinkedIn',
+    'Snapchat',
+    'YouTube',
+    'WhatsApp',
+    'Telegram',
+    'Discord'
+  ];
+
+  List<Map<String, dynamic>> _messages = [];
 
   @override
   void initState() {
     super.initState();
-    _user = types.User(id: Constants.localUsername);
     _loadMessages();
+    // _initializeNotifications();
   }
+
+  // void _initializeNotifications() async {
+  //   // Request notification permissions
+  //   await FirebaseMessaging.instance.requestPermission(
+  //     alert: true,
+  //     badge: true,
+  //     sound: true,
+  //   );
+
+  //   // Save the user's FCM token
+  //   await NotificationService.saveUserFCMToken(Constants.localId);
+
+  //   // Handle incoming messages when app is in foreground
+  //   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+  //     _notificationService.showLocalNotification(
+  //       title: message.notification?.title ?? '',
+  //       body: message.notification?.body ?? '',
+  //     );
+  //   });
+  // }
 
   void _loadMessages() {
     FirebaseFirestore.instance
-        .collection("conversations")
-        .doc("${Constants.localUsername}_chat")
+        .collection("chatrooms")
+        .doc(widget.roomId)
         .collection("chats")
         .orderBy("time", descending: true)
         .snapshots()
         .listen((snapshot) {
       setState(() {
-        _messages = snapshot.docs.map((doc) {
-          final data = doc.data();
-          if (data['isImage'] == true) {
-            return types.ImageMessage(
-              author: types.User(id: data['sender']),
-              id: doc.id,
-              uri: data['imageUrl'],
-              size: data['size'] ?? 0,
-              name: data['fileName'] ?? '',
-              createdAt: data['time'],
-            );
-          } else if (data['isFile'] == true) {
-            return types.FileMessage(
-              author: types.User(id: data['sender']),
-              id: doc.id,
-              name: data['fileName'] ?? '',
-              size: data['size'] ?? 0,
-              uri: data['fileUrl'],
-              createdAt: data['time'],
-            );
-          } else {
-            return types.TextMessage(
-              author: types.User(id: data['sender']),
-              id: doc.id,
-              text: data['message'],
-              createdAt: data['time'],
-            );
-          }
-        }).toList();
+        _messages = snapshot.docs.map((doc) => doc.data()..['id'] = doc.id).toList();
       });
+      _scrollToBottom();
+      _updateUnseenMessages();
+    });
+  }
+
+  Future<void> _updateMessageSeen(String messageId, String senderId) async {
+    try {
+      if (senderId != Constants.localId) {
+        await FirebaseFirestore.instance
+            .collection("chatrooms")
+            .doc(widget.roomId)
+            .collection("chats")
+            .doc(messageId)
+            .update({"seen": true});
+      }
+    } catch (e) {
+      print('Error updating message seen status: $e');
+    }
+  }
+
+  void _updateUnseenMessages() {
+    for (var message in _messages) {
+      _updateMessageSeen(message['id'], message['senderId']);
+    }
+  }
+
+  void _scrollToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          0,
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
+      }
     });
   }
 
@@ -101,488 +182,878 @@ class _ConversationState extends State<Conversation> {
     }
   }
 
-  void _handleSendPressed(types.PartialText message) {
-    _sendMessage(message.text);
+  // Add RegExp patterns for email and links
+  final RegExp _emailRegex = RegExp(r'[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}');
+  final RegExp _linkRegex = RegExp(r'https?:\/\/(?!meet\.google\.com)[^\s]+');
+  final RegExp _mobileNumberRegex = RegExp(r'\b\d{10}\b');
+
+  String _filterContent(String content) {
+    // Filter restricted words
+    for (String word in _restrictedWords) {
+      content = content.replaceAll(RegExp(r'\b' + word + r'\b', caseSensitive: false), '*' * word.length);
+    }
+
+    // Filter email addresses
+    content = content.replaceAllMapped(_emailRegex, (match) => '*' * match.group(0)!.length);
+
+    // Filter links except Google Meet
+    content = content.replaceAllMapped(_linkRegex, (match) => '*' * match.group(0)!.length);
+
+    // Filter mobile numbers
+    content = content.replaceAllMapped(_mobileNumberRegex, (match) => '*' * match.group(0)!.length);
+
+    return content;
   }
 
-  void _handleAttachmentPressed() {
-    showModalBottomSheet<void>(
-      context: context,
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: SizedBox(
-            height: 144,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: <Widget>[
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _handleImageSelection();
-                  },
-                  child: const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('Photo'),
+  Future<void> _sendMessage(String messageText,
+      {String? fileUrl, String? fileName, bool isImage = false, bool isFile = false}) async {
+    try {
+      // Show loading indicator while sending
+      if (isImage || isFile) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Sending...')));
+      }
+
+      // Create the base message map
+      final messageMap = {
+        "message": messageText,
+        "sender": Constants.localUsername,
+        "senderId": Constants.localId,
+        "receiver": widget.name,
+        "receiverId": widget.receiverId,
+        "time": DateTime.now().millisecondsSinceEpoch,
+        "date": "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}",
+        "deleted": false,
+        "seen": false,
+      };
+
+      // Add file-related fields if a file is being sent
+      if (fileUrl != null) {
+        messageMap.addAll({
+          "isFile": !isImage,
+          "isImage": isImage,
+          "fileUrl": fileUrl,
+          "fileName": fileName!,
+        });
+      }
+
+      await _databaseMethods.conversation(widget.roomId, messageMap);
+
+      // Hide loading indicator
+      if (isImage || isFile) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      }
+
+      _messageController.clear();
+      _scrollToBottom();
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error sending message: $e')));
+    }
+  }
+
+  Future<File> _compressImage(File file) async {
+    final img.Image? image = img.decodeImage(await file.readAsBytes());
+    if (image == null) return file;
+
+    final img.Image compressedImage = img.copyResize(
+      image,
+      width: 800, // Max width
+      height: (800 * image.height / image.width).round(), // Maintain aspect ratio
+    );
+
+    final String dir = (await getTemporaryDirectory()).path;
+    final String path = '$dir/${DateTime.now().millisecondsSinceEpoch}.jpg';
+    final File result = File(path)..writeAsBytesSync(img.encodeJpg(compressedImage, quality: 85));
+
+    return result;
+  }
+
+  Future<String?> _generateThumbnail(String imageUrl) async {
+    try {
+      final File file = await _downloadFile(imageUrl);
+      final File thumbnail = await _compressImage(file);
+      return await _uploadFile(thumbnail, 'thumb_${DateTime.now().millisecondsSinceEpoch}.jpg');
+    } catch (e) {
+      print('Error generating thumbnail: $e');
+      return null;
+    }
+  }
+
+  Future<File> _downloadFile(String url) async {
+    try {
+      // Get temporary directory
+      final Directory tempDir = await getTemporaryDirectory();
+      final String tempPath = tempDir.path;
+
+      // Create a unique filename
+      final String fileName = '${DateTime.now().millisecondsSinceEpoch}.tmp';
+      final String filePath = '$tempPath/$fileName';
+
+      // Download the file
+      final http.Response response = await http.get(Uri.parse(url));
+
+      // Save to temporary file
+      final File file = File(filePath);
+      await file.writeAsBytes(response.bodyBytes);
+
+      return file;
+    } catch (e) {
+      print('Error downloading file: $e');
+      rethrow;
+    }
+  }
+
+  final List<String> _allowedDocumentExtensions = [
+    'pdf',
+    'doc',
+    'docx',
+    'txt',
+    'rtf',
+    'odt',
+    'xls',
+    'xlsx',
+    'csv',
+    'ppt',
+    'pptx',
+    'pages',
+    'numbers',
+    'key',
+    'md'
+  ];
+
+// Add this validation function
+  bool _isValidDocumentType(String fileName) {
+    final extension = fileName.split('.').last.toLowerCase();
+    return _allowedDocumentExtensions.contains(extension);
+  }
+
+  void _handleAttachmentPressed() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: _allowedDocumentExtensions,
+      );
+
+      if (result != null && result.files.single.path != null) {
+        final file = File(result.files.single.path!);
+        final fileName = result.files.single.name;
+        final fileSize = await file.length();
+        final fileSizeInMB = fileSize / (1024 * 1024);
+
+        // Check file size (limit to 10MB)
+        if (fileSizeInMB > 10) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('File size must be less than 10MB'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+
+        if (!_isValidDocumentType(fileName)) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('Please select only document files. Audio, video, and other file types are not allowed.'),
+                backgroundColor: Colors.red,
+              ),
+            );
+          }
+          return;
+        }
+
+        // Show file preview dialog
+        if (mounted) {
+          final bool? shouldSend = await showDialog<bool>(
+            context: context,
+            builder: (context) => _buildFilePreviewDialog(fileName, fileSizeInMB),
+          );
+
+          if (shouldSend == true) {
+            // Show loading indicator
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('Uploading document...')),
+              );
+            }
+
+            final fileUrl = await _uploadFile(file, fileName);
+            if (fileUrl != null) {
+              await _sendMessage('', fileUrl: fileUrl, fileName: fileName, isFile: true);
+
+              // Show success message
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Document uploaded successfully'),
+                    backgroundColor: Colors.green,
                   ),
-                ),
-                TextButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                    _handleFileSelection();
-                  },
-                  child: const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('File'),
-                  ),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text('Cancel'),
-                  ),
-                ),
-              ],
-            ),
+                );
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error uploading document: $e'),
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
-      },
+      }
+    }
+  }
+
+  Widget _buildFilePreviewDialog(String fileName, double fileSizeInMB) {
+    return AlertDialog(
+      title: Text('Send File?', style: GoogleFonts.archivo()),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _getDocumentIcon(fileName),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      fileName,
+                      style: GoogleFonts.archivo(fontWeight: FontWeight.bold),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      '${fileSizeInMB.toStringAsFixed(2)} MB',
+                      style: GoogleFonts.archivo(color: Colors.grey),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+      actions: [
+        TextButton(
+          child: const Text('Cancel'),
+          onPressed: () => Navigator.of(context).pop(false),
+        ),
+        ElevatedButton(
+          child: const Text('Send'),
+          onPressed: () => Navigator.of(context).pop(true),
+        ),
+      ],
     );
   }
 
-  void _handleFileSelection() async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.any,
-    );
+  Widget _getDocumentIcon(String fileName) {
+    final extension = fileName.split('.').last.toLowerCase();
 
-    if (result != null && result.files.single.path != null) {
-      final file = File(result.files.single.path!);
-      final fileName = result.files.single.name;
-      final fileSize = result.files.single.size;
-      final fileUrl = await _uploadFile(file, fileName);
-
-      if (fileUrl != null) {
-        final message = types.PartialFile(
-          name: fileName,
-          size: fileSize,
-          uri: fileUrl,
-        );
-        _sendMessage('', file: message);
-      }
+    switch (extension) {
+      case 'pdf':
+        return const Icon(Icons.picture_as_pdf, color: Colors.red);
+      case 'doc':
+      case 'docx':
+      case 'txt':
+      case 'rtf':
+      case 'odt':
+        return const Icon(Icons.description, color: Colors.blue);
+      case 'xls':
+      case 'xlsx':
+      case 'csv':
+        return const Icon(Icons.table_chart, color: Colors.green);
+      case 'ppt':
+      case 'pptx':
+        return const Icon(Icons.slideshow, color: Colors.orange);
+      default:
+        return const Icon(Icons.insert_drive_file, color: Colors.grey);
     }
   }
 
   void _handleImageSelection() async {
-    final result = await _imagePicker.pickImage(
-      imageQuality: 70,
-      maxWidth: 1440,
-      source: ImageSource.gallery,
-    );
-
+    final result = await _imagePicker.pickImage(source: ImageSource.gallery);
     if (result != null) {
-      final file = File(result.path);
-      final fileName = result.name;
-      final imageUrl = await _uploadFile(file, fileName);
+      setState(() {
+        _selectedImage = result;
+      });
 
-      if (imageUrl != null) {
-        final bytes = await file.readAsBytes();
-        final image = await decodeImageFromList(bytes);
-        final message = types.PartialImage(
-          height: image.height.toDouble(),
-          name: fileName,
-          size: bytes.length,
-          uri: imageUrl,
-          width: image.width.toDouble(),
+      // Show preview dialog
+      if (mounted) {
+        await showDialog(
+          context: context,
+          builder: (context) => _buildImagePreviewDialog(result),
         );
-        _sendMessage('', image: message);
       }
     }
   }
-String _sanitizeMessage(String message) {
-    // Regular expressions for detecting sensitive information
-    final phoneRegex = RegExp(r'\b\d{10}\b|\b\d{3}[-.]?\d{3}[-.]?\d{4}\b');
-    final emailRegex = RegExp(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b');
-    final linkRegex = RegExp(r'(https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|www\.[a-zA-Z0-9][a-zA-Z0-9-]+[a-zA-Z0-9]\.[^\s]{2,}|https?:\/\/(?:www\.|(?!www))[a-zA-Z0-9]+\.[^\s]{2,}|www\.[a-zA-Z0-9]+\.[^\s]{2,})');
-    
-    // List of abusive words (this list should be more comprehensive in a real application)
-    final abuseWords = ['address', 'phone', 'email', 'social security', 'ssn', 'bank account', 'credit card', 'debit card', 'PIN', 'password', 'username', 'login', 'passport', 'ID', 'driver\'s license', 'birthdate', 'birthday', 'first name', 'last name', 'full name', 'home address', 'work address', 'school address', 'city', 'state', 'country', 'zip code', 'postal code', 'mobile number', 'landline', 'street', 'apartment', 'user ID', 'IP address', 'security question', 'mother\'s maiden name', 'medical record', 'health info', 'insurance number', 'social media', 'Facebook', 'Instagram', 'Twitter', 'TikTok', 'LinkedIn', 'Snapchat', 'YouTube', 'WhatsApp', 'Telegram', 'Discord']
-;
 
-    // Replace phone numbers
-    message = message.replaceAllMapped(phoneRegex, (match) => '*' * match.group(0)!.length);
-
-    // Replace email addresses
-    message = message.replaceAllMapped(emailRegex, (match) => '*' * match.group(0)!.length);
-
-    // Replace links, except Google Meet links
-    message = message.replaceAllMapped(linkRegex, (match) {
-      final link = match.group(0)!;
-      if (link.contains('meet.google.com')) {
-        return link;
-      }
-      return '*' * link.length;
-    });
-
-    // Replace abusive words
-    for (final word in abuseWords) {
-      final regex = RegExp(r'\b' + word + r'\b', caseSensitive: false);
-      message = message.replaceAllMapped(regex, (match) => '*' * match.group(0)!.length);
-    }
-
-    return message;
-  }
-
-  void _sendMessage(String messageText, {types.PartialImage? image, types.PartialFile? file}) async {
-    // Sanitize the message text
-    final sanitizedMessageText = _sanitizeMessage(messageText);
-
-    final messageMap = {
-      "message": sanitizedMessageText,
-      "sender": Constants.localUsername,
-      "receiver": widget.name,
-      "time": DateTime.now().millisecondsSinceEpoch,
-      "date": "${DateTime.now().day}/${DateTime.now().month}/${DateTime.now().year}",
-      "deleted": false,
-      "seen": false,
-    };
-
-    if (image != null) {
-      messageMap.addAll({
-        "isImage": true,
-        "imageUrl": image.uri,
-        "fileName": image.name,
-        "size": image.size,
-      });
-    } else if (file != null) {
-      messageMap.addAll({
-        "isFile": true,
-        "fileUrl": file.uri,
-        "fileName": file.name,
-        "size": file.size,
-      });
-    }
-
-    // Save in sender's conversation
-    await FirebaseFirestore.instance
-        .collection("conversations")
-        .doc("${Constants.localUsername}_chat")
-        .collection("chats")
-        .add(messageMap);
-
-    // Save in receiver's conversation
-    await FirebaseFirestore.instance
-        .collection("conversations")
-        .doc("${widget.name}_chat")
-        .collection("chats")
-        .add(messageMap);
-
-    await _databaseMethods.updateUnreadMessages(widget.roomId, 1, widget.name);
-  }
-  void _handleMessageTap(BuildContext _, types.Message message) async {
-    if (message is types.FileMessage) {
-      var localPath = message.uri;
-
-      if (!message.uri.startsWith('file://')) {
-        final client = http.Client();
-        final request = await client.get(Uri.parse(message.uri));
-        final bytes = request.bodyBytes;
-        final documentsDir = (await getApplicationDocumentsDirectory()).path;
-        localPath = '$documentsDir/${message.name}';
-
-        if (!File(localPath).existsSync()) {
-          final file = File(localPath);
-          await file.writeAsBytes(bytes);
-        }
-      }
-
-      await OpenFile.open(localPath);
-    }
-  }
-
-   @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: Row(
+  Widget _buildImagePreviewDialog(XFile image) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        decoration: BoxDecoration(
+          color: Theme.of(context).dialogBackgroundColor,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            RandomAvatar(widget.svg, height: 40, width: 40),
-            const SizedBox(width: 12),
-            Text(widget.name),
+            AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              title: Text('Preview Image', style: GoogleFonts.archivo()),
+              actions: [
+                IconButton(
+                  icon: const Icon(Icons.close),
+                  onPressed: () {
+                    setState(() {
+                      _selectedImage = null;
+                    });
+                    Navigator.pop(context);
+                  },
+                ),
+              ],
+            ),
+            Flexible(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4.0,
+                child: Image.file(
+                  File(image.path),
+                  fit: BoxFit.contain,
+                ),
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.all(16.0),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  TextButton.icon(
+                    icon: const Icon(Icons.cancel),
+                    label: const Text('Cancel'),
+                    onPressed: () {
+                      setState(() {
+                        _selectedImage = null;
+                      });
+                      Navigator.pop(context);
+                    },
+                  ),
+                  ElevatedButton.icon(
+                    icon: const Icon(Icons.send),
+                    label: const Text('Send'),
+                    onPressed: () async {
+                      Navigator.pop(context);
+                      await _uploadAndSendImage(image);
+                      setState(() {
+                        _selectedImage = null;
+                      });
+                    },
+                  ),
+                ],
+              ),
+            ),
           ],
         ),
       ),
-      body: Container(
-        decoration: const BoxDecoration(
-          image: DecorationImage(
-            image: AssetImage("assets/images/bg.png"),
-            fit: BoxFit.contain,
-          ),
-        ),
-        child: Chat(
-          messages: _messages,
-          onSendPressed: _handleSendPressed,
-          user: _user,
-          onAttachmentPressed: _handleAttachmentPressed,
-          onMessageTap: _handleMessageTap,
-          theme: DefaultChatTheme(
-            backgroundColor: Colors.transparent,
-            inputBackgroundColor: Colors.grey[800]!,
-            
-            secondaryColor: Colors.grey[700]!,
-           
-          ),
-          customMessageBuilder: (types.Message message, {required int messageWidth}) {
-            if (message is types.FileMessage) {
-              return _buildFileMessagePreview(message);
-            }
-            if (message is types.CustomMessage) {
-              // Handle custom messages if needed
-              return _buildCustomMessagePreview(message);
-            }
-            return const SizedBox.shrink();
-          },
-        ),
-      ),
     );
   }
 
-  Widget _buildFileMessagePreview(types.FileMessage message) {
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.grey[800]!.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: Row(
-        children: [
-          const Icon(Icons.insert_drive_file, color: Colors.white),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  message.name,
-                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                Text(
-                  '${(message.size / 1024 / 1024).toStringAsFixed(2)} MB',
-                  style: TextStyle(color: Colors.grey[400], fontSize: 12),
-                ),
-              ],
-            ),
-          ),
-          IconButton(
-            icon: const Icon(Icons.download, color: Colors.white),
-            onPressed: () => _handleMessageTap(context, message),
-          ),
-        ],
-      ),
-    );
-  }
+  Future<void> _uploadAndSendImage(XFile image) async {
+    try {
+      final file = File(image.path);
+      final fileName = image.name;
 
-  Widget _buildCustomMessagePreview(types.CustomMessage message) {
-    // Handle custom messages if needed
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 8),
-      padding: const EdgeInsets.all(8),
-      decoration: BoxDecoration(
-        color: Colors.grey[800]!.withOpacity(0.8),
-        borderRadius: BorderRadius.circular(8),
-      ),
-      child: const Text(
-        'Custom Message',
-        style: TextStyle(color: Colors.white),
-      ),
-    );
-  }
-}
-class MessageTile extends StatelessWidget {
-  final String message;
-  final bool sentByLocalUser;
-  final DateTime time;
-  final bool deleted;
-  final String roomId;
-  final String chatId;
-  final bool seen;
-  final bool isFile;
-  final bool isImage;
-  final String? fileName;
-  final String? fileUrl;
-  final String? imageUrl;
-  final Function(String, String, bool) onDelete;
+      // Show loading indicator
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Sending image...')),
+        );
+      }
 
-  const MessageTile({
-    super.key,
-    required this.chatId,
-    required this.seen,
-    required this.roomId,
-    required this.message,
-    required this.sentByLocalUser,
-    required this.time,
-    required this.deleted,
-    required this.onDelete,
-    this.isFile = false,
-    this.isImage = false,
-    this.fileName,
-    this.fileUrl,
-    this.imageUrl,
-  });
+      final imageUrl = await _uploadFile(file, fileName);
+      if (imageUrl != null) {
+        await _sendMessage('', fileUrl: imageUrl, fileName: fileName, isImage: true);
 
-  @override
-  Widget build(BuildContext context) {
-    return Align(
-      alignment: sentByLocalUser ? Alignment.centerRight : Alignment.centerLeft,
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxWidth: MediaQuery.of(context).size.width * 0.80,
-        ),
-        child: Card(
-          color: sentByLocalUser ? HexColor("#5953ff") : HexColor("#2e333d"),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.only(
-              topLeft: const Radius.circular(15),
-              topRight: const Radius.circular(15),
-              bottomLeft: Radius.circular(sentByLocalUser ? 15 : 5),
-              bottomRight: Radius.circular(sentByLocalUser ? 5 : 15),
+        // Show success message
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Image sent successfully'),
+              backgroundColor: Colors.green,
             ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error sending image: $e'),
+            backgroundColor: Colors.red,
           ),
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildMessageContent(context),
-                const SizedBox(height: 4),
-                _buildMessageMeta(),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildMessageContent(BuildContext context) {
-    if (deleted) {
-      return _buildDeletedMessage();
-    } else if (isImage && imageUrl != null) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          ClipRRect(
-            borderRadius: BorderRadius.circular(8),
-            child: Image.network(
-              imageUrl!,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return const Center(child: CircularProgressIndicator());
-              },
-            ),
-          ),
-        ],
-      );
-    } else {
-      return _buildRegularMessage();
+        );
+      }
     }
   }
 
-  Widget _buildDeletedMessage() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        const Icon(Icons.disabled_by_default_outlined, color: Colors.white54, size: 16),
-        const SizedBox(width: 5),
-        Text(
-          "This message has been deleted",
-          style: GoogleFonts.archivo(
-            color: Colors.white54,
-            fontSize: 13,
-            fontStyle: FontStyle.italic,
-          ),
-        ),
-      ],
-    );
-  }
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Scaffold(
+      appBar: AppBar(
+        title: Text(widget.name, style: GoogleFonts.archivo()),
 
- Widget _buildRegularMessage() {
-    return GestureDetector(
-      onLongPress: sentByLocalUser && !deleted ? _showDeleteDialog : null,
-      child: isFile
-          ? Row(
-              children: [
-                const Icon(Icons.file_present, color: Colors.white),
-                const SizedBox(width: 8),
-                Flexible(
-                  child: Text(
-                    message,
-                    style: GoogleFonts.archivo(
-                      color: Colors.white,
-                      fontSize: 16,
-                    ),
-                  ),
+        // backgroundColor: Colors.blueGrey[800],
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Container(
+          decoration: const BoxDecoration(
+              image: DecorationImage(image: AssetImage("assets/images/bg.png"), fit: BoxFit.contain)),
+          child: Column(
+            children: [
+              Expanded(
+                child: ListView.builder(
+                  controller: _scrollController,
+                  reverse: true,
+                  itemCount: _messages.length,
+                  itemBuilder: (context, index) {
+                    final message = _messages[index];
+                    final DateTime messageDate = DateTime.fromMillisecondsSinceEpoch(message["time"]);
+
+                    // Show date header if it's the first message or if the date changes
+                    bool showDateHeader = index == _messages.length - 1 ||
+                        !_isSameDay(
+                          DateTime.fromMillisecondsSinceEpoch(_messages[index + 1]["time"]),
+                          messageDate,
+                        );
+
+                    return Column(
+                      children: [
+                        if (showDateHeader) _buildDateHeader(messageDate),
+                        MessageBubble(
+                          message: message["message"],
+                          isMe: message["sender"] == Constants.localUsername,
+                          timestamp: messageDate,
+                          isImage: message["isImage"] ?? false,
+                          isFile: message["isFile"] ?? false,
+                          fileUrl: message["fileUrl"],
+                          fileName: message["fileName"],
+                          seen: message["seen"] ?? false,
+                          id: message["id"],
+                        ),
+                      ],
+                    );
+                  },
                 ),
-              ],
-            )
-          : Text(
-              message,
-              style: GoogleFonts.archivo(
-                color: Colors.white,
-                fontSize: 16,
               ),
-            ),
-    );
-  }
-
-
-  Widget _buildMessageMeta() {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          DateFormat("HH:mm").format(time),
-          style: GoogleFonts.archivo(
-            color: Colors.white70,
-            fontSize: 10,
+              _buildMessageInput(),
+            ],
           ),
         ),
-        const SizedBox(width: 5),
-        if (sentByLocalUser) _buildSeenIndicator(),
-      ],
+      ),
     );
   }
 
-  Widget _buildSeenIndicator() {
-    return Icon(
-      FontAwesomeIcons.check,
-      color: seen ? Colors.lightBlueAccent : Colors.white70,
-      size: 12,
-    );
-  }
-
-  void _showDeleteDialog() {
-    showDialog(
-      context: GlobalKey<NavigatorState>().currentState!.context,
-      builder: (context) => AlertDialog(
-        title: Text('Delete Message', style: GoogleFonts.archivo()),
-        content: Text('Are you sure you want to delete this message?', style: GoogleFonts.archivo()),
-        actions: [
-          TextButton(
-            child: Text('Cancel', style: GoogleFonts.archivo()),
-            onPressed: () => Navigator.of(context).pop(),
+  Widget _buildMessageInput() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+      child: Row(
+        children: [
+          IconButton(
+            icon: const Icon(Icons.attach_file),
+            onPressed: _handleAttachmentPressed,
           ),
-          TextButton(
-            child: Text('Delete', style: GoogleFonts.archivo(color: Colors.red)),
+          IconButton(
+            icon: const Icon(Icons.image),
+            onPressed: _handleImageSelection,
+          ),
+          Expanded(
+            child: TextField(
+              controller: _messageController,
+              decoration: const InputDecoration(
+                hintText: "Type a message",
+                border: InputBorder.none,
+                filled: true,
+                // fillColor: Colors.transparent,
+              ),
+              onChanged: (value) {
+                final filteredText = _filterContent(value);
+                if (filteredText != value) {
+                  setState(() {
+                    _messageController.text = filteredText;
+                    _messageController.selection = TextSelection.fromPosition(
+                      TextPosition(offset: filteredText.length),
+                    );
+                  });
+                }
+              },
+            ),
+          ),
+          IconButton(
+            icon: const Icon(Icons.send),
             onPressed: () {
-              onDelete(roomId, chatId, true);
-              Navigator.of(context).pop();
+              final filteredMessage = _filterContent(_messageController.text);
+              // Only send message if it's not empty after trimming whitespace
+              if (filteredMessage.trim().isNotEmpty) {
+                _sendMessage(filteredMessage);
+              }
             },
           ),
         ],
       ),
     );
+  }
+
+  bool _isSameDay(DateTime date1, DateTime date2) {
+    return date1.year == date2.year && date1.month == date2.month && date1.day == date2.day;
+  }
+
+  Widget _buildDateHeader(DateTime date) {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 16),
+      child: Center(
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            // color: Colors.black54,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Text(
+            _getDateText(date),
+            style: GoogleFonts.archivo(
+              // color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _getDateText(DateTime date) {
+    final now = DateTime.now();
+    final yesterday = DateTime(now.year, now.month, now.day - 1);
+    final messageDate = DateTime(date.year, date.month, date.day);
+
+    if (messageDate == DateTime(now.year, now.month, now.day)) {
+      return 'Today';
+    } else if (messageDate == yesterday) {
+      return 'Yesterday';
+    } else {
+      return DateFormat('MMMM d, y').format(date);
+    }
+  }
+}
+
+class MessageBubble extends StatefulWidget {
+  final String message;
+  final bool isMe;
+  final DateTime timestamp;
+  final bool isImage;
+  final bool isFile;
+  final String? fileUrl;
+  final String? fileName;
+  final bool seen;
+  final String? id;
+
+  const MessageBubble({
+    super.key,
+    required this.message,
+    required this.isMe,
+    required this.timestamp,
+    this.isImage = false,
+    this.isFile = false,
+    this.fileUrl,
+    this.fileName,
+    this.seen = false,
+    required this.id,
+  });
+
+  @override
+  State<MessageBubble> createState() => _MessageBubbleState();
+}
+
+class _MessageBubbleState extends State<MessageBubble> {
+  bool _isDownloading = false;
+  final _transformationController = TransformationController();
+  late TapDownDetails _doubleTapDetails;
+
+  void _handleDoubleTapDown(TapDownDetails details) {
+    _doubleTapDetails = details;
+  }
+
+  void _handleDoubleTap() {
+    if (_transformationController.value != Matrix4.identity()) {
+      _transformationController.value = Matrix4.identity();
+    } else {
+      final position = _doubleTapDetails.localPosition;
+      _transformationController.value = Matrix4.identity()
+        ..translate(-position.dx * 2, -position.dy * 2)
+        ..scale(3.0);
+    }
+  }
+
+  Widget _buildImagePreview(BuildContext context) {
+    return GestureDetector(
+      onTap: () => _showImagePreview(context),
+      child: Container(
+        constraints: const BoxConstraints(
+          maxWidth: 200,
+          maxHeight: 200,
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            widget.fileUrl!,
+            fit: BoxFit.cover,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Container(
+                width: 200,
+                height: 150,
+                alignment: Alignment.center,
+                child: CircularProgressIndicator(
+                  value: loadingProgress.expectedTotalBytes != null
+                      ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                      : null,
+                ),
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              return Container(
+                width: 200,
+                height: 150,
+                color: Colors.grey[300],
+                child: const Icon(Icons.error),
+              );
+            },
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showImagePreview(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: Stack(
+          children: [
+            InteractiveViewer(
+              transformationController: _transformationController,
+              minScale: 0.5,
+              maxScale: 4.0,
+              child: GestureDetector(
+                onDoubleTapDown: _handleDoubleTapDown,
+                onDoubleTap: _handleDoubleTap,
+                child: Image.network(
+                  widget.fileUrl!,
+                  fit: BoxFit.contain,
+                  width: MediaQuery.of(context).size.width,
+                  height: MediaQuery.of(context).size.height,
+                ),
+              ),
+            ),
+            Positioned(
+              top: 40,
+              right: 20,
+              child: IconButton(
+                icon: const Icon(Icons.close, color: Colors.white, size: 30),
+                onPressed: () {
+                  _transformationController.value = Matrix4.identity();
+                  Navigator.pop(context);
+                },
+              ),
+            ),
+            Positioned(
+              bottom: 40,
+              right: 20,
+              child: Row(
+                children: [
+                  IconButton(
+                    icon: const Icon(Icons.download, color: Colors.white, size: 30),
+                    onPressed: _downloadAndOpenFile,
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _getDocumentIcon() {
+    if (widget.fileName == null) return const Icon(Icons.insert_drive_file, color: Colors.white);
+
+    final extension = widget.fileName!.split('.').last.toLowerCase();
+
+    switch (extension) {
+      case 'pdf':
+        return const Icon(Icons.picture_as_pdf, color: Colors.white);
+      case 'doc':
+      case 'docx':
+      case 'txt':
+      case 'rtf':
+      case 'odt':
+        return const Icon(Icons.description, color: Colors.white);
+      case 'xls':
+      case 'xlsx':
+      case 'csv':
+        return const Icon(Icons.table_chart, color: Colors.white);
+      case 'ppt':
+      case 'pptx':
+        return const Icon(Icons.slideshow, color: Colors.white);
+      default:
+        return const Icon(Icons.insert_drive_file, color: Colors.white);
+    }
+  }
+
+  Future<void> _downloadAndOpenFile() async {
+    if (_isDownloading) return;
+
+    try {
+      setState(() {
+        _isDownloading = true;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Downloading file...')),
+      );
+
+      final Directory appDocDir = await getApplicationDocumentsDirectory();
+      final String fileName = widget.fileName ?? 'downloaded_file';
+      final String filePath = '${appDocDir.path}/$fileName';
+
+      final response = await http.get(Uri.parse(widget.fileUrl!));
+      final file = File(filePath);
+      await file.writeAsBytes(response.bodyBytes);
+
+      setState(() {
+        _isDownloading = false;
+      });
+
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('File downloaded to: $filePath'),
+          duration: const Duration(seconds: 3),
+        ),
+      );
+    } catch (e) {
+      setState(() {
+        _isDownloading = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error downloading file: $e')),
+      );
+    }
+  }
+
+  Widget _buildContent() {
+    if (widget.isImage && widget.fileUrl != null) {
+      return _buildImagePreview(context);
+    } else if (widget.isFile && widget.fileUrl != null) {
+      return GestureDetector(
+        onTap: _downloadAndOpenFile,
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _isDownloading
+                  ? const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                      ),
+                    )
+                  : _getDocumentIcon(),
+              const SizedBox(width: 8),
+              Flexible(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      widget.fileName ?? 'Document',
+                      style: GoogleFonts.archivo(),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      'Tap to download',
+                      style: GoogleFonts.archivo(
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+    return Text(widget.message, style: GoogleFonts.archivo(color: Colors.white));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4.0, horizontal: 8.0),
+      child: Align(
+        alignment: widget.isMe ? Alignment.centerRight : Alignment.centerLeft,
+        child: Container(
+          decoration: BoxDecoration(
+            color: widget.isMe ? const Color(0xff5953ff) : const Color(0xff12744f),
+            borderRadius: BorderRadius.circular(12),
+          ),
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _buildContent(),
+              const SizedBox(height: 4),
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    DateFormat('h:mm a').format(widget.timestamp),
+                    style: GoogleFonts.archivo(fontSize: 10, color: Colors.grey[100]),
+                  ),
+                  if (widget.isMe) ...[
+                    const SizedBox(width: 4),
+                    Text(
+                      widget.seen ? "seen" : "sent",
+                      style: GoogleFonts.archivo(
+                        fontSize: 10,
+                        color: Colors.blue[100],
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _transformationController.dispose();
+    super.dispose();
   }
 }
